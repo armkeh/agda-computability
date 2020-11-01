@@ -1,0 +1,510 @@
+#+Title: Master thesis document
+#+Author: Mark Armstrong
+#+Description: Master document which tracks thesis work.
+
+* Introduction
+
+This file contains TODOs, notes (including meeting notes,
+notes to self, and drafts of sections),
+and perhaps later will contain actual reports/papers
+compiled from other documents in this repository.
+
+* TODOs                                         :noexport:
+
+** TODO An Elisp script to propogate each level of the ~src~ directory with a ReadMe
+
+The README at the top level there warns that the code
+is tangled, as so should not be modified directly.
+I'd like that copied to all the subdirectories.
+
+Probably the copying should be tied to saving this file,
+if that doesn't introduce bad lag. 
+
+** TODO Create pattern file(s) to segregate the pattern declarations.
+
+This is that style used by the standard library; it avoids
+unintended leakage of the patterns to importers of the module.
+    
+* Notes                                         :noexport:
+
+:TODO:
+
+** Introduction notes
+
+*** Proving in Agda
+
+**** Preamble                                :ignore:
+
+Herein we give a brief introduction to the concepts underpinning
+the activity of “proving in Agda”.
+
+Specifically, we recall in turn
+1. the introduction rules of (the usual logical operators) of intuitionistic logic,
+2. the constructors for (the corresponding types in) type theory, and
+3. the definition of those constructors in Agda.
+
+**** From intuitionistic logic to type theory
+
+Recall the introduction rules of intuitionistic logic.
+
+We choose in our notation to introduce variables, stating their types,
+in the premises.
+Note the commas to the left of entailments (~⊢~) are conjunctional,
+and that entailment has lower precedence than the other operators.
+#+attr_LaTeX: :font \scriptsize
+|-----------------------+-------------------------------|
+| Predicate constructor | Introduction rule(s)          |
+|-----------------------+-------------------------------|
+| ~⊤~                     | ~⊤~                             |
+| ~⊥~                     | ———                           |
+| ~_∨_~                   | ~P ⊢ P ∨ Q~                     |
+|                       | ~Q ⊢ P ∨ Q~                     |
+| ~_∧_~                   | ~P , Q ̄⊢ P ∧ Q~                 |
+| ~_⇒_~                   | (~P ⊢ Q) ⊢ P ⇒ Q~               |
+| ~∀_∶_•_~                | ~(x ∶ A ⊢ P x) ⊢ ∀ x ∶ A • P x~ |
+| ~∃_∶_•_~                | ~w ∶ A, P w ⊢ ∃ x ∶ A • P x~    |
+|-----------------------+-------------------------------|
+
+The operatorss ~¬_~ and ~_↔_~ are simply shorthands;
+#+begin_center
+~¬ P = P ⇒ ⊥~
+#+end_center
+and
+#+begin_center
+~P ↔ Q = (P ⇒ Q) ∧ (Q ⇒ P)~
+#+end_center
+
+Let us refine these rules by being explicit about /types/,
+assuming a type of /truth values/, which we call ~Bool~,
+and a type of /types/, called ~Set~.
+That is, we treat ~P~ and ~Q~ now as variables.
+#+attr_LaTeX: :font \scriptsize
+|-----------------------+------------------------------------------------------|
+| Predicate constructor | Introduction rule(s)                                 |
+|-----------------------+------------------------------------------------------|
+| ~⊤~                     | ~⊤~                                                    |
+| ~⊥~                     | ———                                                  |
+| ~_∨_~                   | ~P Q ∶ Bool, P ⊢ P ∨ Q~                                |
+|                       | ~P Q ∶ Bool, ~Q ⊢ P ∨ Q~                                |
+| ~_∧_~                   | ~P Q ∶ Bool, P , Q ̄⊢ P ∧ Q~                            |
+| ~∃_∶_•_~                | ~A ∶ Set, P ∶ A ⇒ Bool, w ∶ A, P w ⊢ ∃ x ∶ A • P x~    |
+| ~_⇒_~                   | ~P Q ∶ Bool, (~P ⊢ Q) ⊢ P ⇒ Q~                          |
+| ~∀_∶_•_~                | ~A ∶ Set, P ∶ A ⇒ Bool, (x ∶ A ⊢ P x) ⊢ ∀ x ∶ A • P x~ |
+|-----------------------+------------------------------------------------------|
+
+Now, we transition to the realm of /type theory/ by employing
+the type of types, ~Set~, as truth values;
+any occupied type is consider a true value,
+and the empty type is falsehood.
+#+attr_LaTeX: :font \scriptsize
+|-----------------------+-----------------------------------------------------|
+| Predicate constructor | Introduction rule(s)                                |
+|-----------------------+-----------------------------------------------------|
+| ~⊤~                     | ~⊤~                                                   |
+| ~⊥~                     | ———                                                 |
+| ~_∨_~                   | ~P Q ∶ Set, P ⊢ P ∨ Q~                                |
+|                       | ~P Q ∶ Set, ~Q ⊢ P ∨ Q~                                |
+| ~_∧_~                   | ~P Q ∶ Set, P , Q ̄⊢ P ∧ Q~                            |
+| ~∃_∶_•_~                | ~A ∶ Set, P ∶ A ⇒ Set, w ∶ A, P w ⊢ ∃ x ∶ A • P x~    |
+| ~_⇒_~                   | ~P Q ∶ Set, (~P ⊢ Q) ⊢ P ⇒ Q~                          |
+| ~∀_∶_•_~                | ~A ∶ Set, P ∶ A ⇒ Set, (x ∶ A ⊢ P x) ⊢ ∀ x ∶ A • P x~ |
+|-----------------------+-----------------------------------------------------|
+
+Now let us quickly switch focus, and consider several /type/ operators,
+along with their corresponding constructors.
+Specifically,
+- the single element /unit/ type, ~⊤~,
+- the /empty/ type, ~⊥~,
+- the disjoint union, or /sum/ type operator, ~_⊎_~,
+- the /product/ type operator, ~_×_~,
+- the /dependent product/ type operator[fn:dependent-product-sum], ~Σ_∶_•_~,
+- the (simple) /function/ type operator[fn:function-type], ~_⟶_~, and
+- the /dependent function/ type operator, ~Π_∶_•_~.
+#+attr_LaTeX: :font \scriptsize
+|----------+---------------------------------------------------------|
+| Operator | Constructor type(s)                                     |
+|----------+---------------------------------------------------------|
+| ~⊤~        | ~⊤~                                                       |
+| ~⊥~        | ———                                                     |
+| ~_⊎_~      | ~A B ∶ Set → A → A ⊎ B~                                   |
+|          | ~A B ∶ Set → B → A ⊎ B~                                   |
+| ~_×_~      | ~A B ∶ Set → B → A × B~                                   |
+| ~Σ_∶_•_~   | ~A ∶ Set → B : (A → Set) → (a : A) → B a → Σ a ∶ A • B~   |
+| ~_⟶_~      | ~A B ∶ Set → (A → B) → (A ⟶ B)~                           |
+| ~Π_∶_•_~   | ~A ∶ Set → B : (A → Set) → ((a : A) → B a) → Π a : A • B a~ |
+|----------+---------------------------------------------------------|
+
+The reader will note that the introduction rules and these constructors
+correspond exactly; this is the Curry-Howard correspondence,
+which allows us to use /types/ in place of /propositions/.
+Then (total, terminating) /programs/ can be thought of
+as being /proofs/ of the proposition corresponding to their types.
+
+Our next step is to examine the implementations of these types
+in Agda.
+
+***** Footnotes                             :ignore:
+
+[fn:dependent-product-sum]
+We use the name “dependent product” for Σ-types,
+since they are a generalised case of the “product” type.
+Confusingly, Π-types, which we call “dependent functions”, are also
+often referred to as “dependent products”, in which case
+Σ-types are called “dependent sum” types.
+
+[fn:function-type]
+We use the arrow ~⟶~ as the function type former here,
+distinguishing it from the arrow ~→~.
+Compare this to the uses of ~⇒~ and ~⊢~ in our logic rules.
+In practice, we will not make this distinction,
+and the arrow ~→~ will be used as the function type former.
+
+***** COMMENT Elimination rules
+
+|-----------------------+------------------------------------------------------------------|
+| Predicate constructor | Elimination rules                                                |
+|-----------------------+------------------------------------------------------------------|
+| ~⊤~                     | ———                                                              |
+| ~⊥~                     | ~⊥ ⊢ p~, for any ~p~                                                 |
+| ~_∨_~                   | (~p ∨ q) ⊢ p → r ⊢ q → r ⊢ r~                                      |
+| ~_∧_~                   | ~p ∧ q ⊢ p~                                                        |
+|                       | ~p ∧ q ⊢ q~                                                        |
+| ~_→_~                   | ~p ∧ p → q ⊢ q~                                                    |
+| ~∀_∶_•_~                | ~∀ x ∶ A • P x, w ∶ A → P w~                                       |
+| ~∃_∶_•_~                | ~(x ∶ A, P x ⊢ q) ⊢ (∃ x ∶ A • P x ⊢ q)~, provided ~x~ not free in ~q~ |
+|-----------------------+------------------------------------------------------------------|
+
+**** The datatypes in Agda
+
+***** Simple ~data~-types – unit and empty
+
+We make use of the ~data~ keyword in Agda to define new
+(inductive) datatypes.
+The general form of the definition (of a parameter free, non-indexed)
+inductive datatype ~D~ is
+#+begin_example agda2
+data D : Sort where
+  C₁ : A₁ → D
+  C₂ : A₂ → D
+  …
+  Cₙ : Aₙ → D
+#+end_example
+where ~Sort~ is a /sort/ (or universe) such as
+- ~Set~, the type of “small” sets,
+- ~Set₁~, the type of the type of “small” sets[fn:universes], or
+- ~Prop~, the type of /definitionally irrelevant propositions/[fn:prop]
+and ~C₁~, ~C₂~, …, ~Cₙ~ are the /constructors/ of the type
+—and these constructors are the only ways to form elements of ~D~.
+
+For instance, the unit and empty types are defined as
+#+begin_src agda2
+data ⊤ : Set where
+  tt : ⊤
+
+data ⊥ : Set where
+  -- No constructors
+#+end_src
+
+***** Parameterisation and level polymorphism – sums
+
+It's also possible for datatypes to be /parameterised/ or /indexed/.
+- Parameters are listed /before/ the colon,
+  and their values are the same across all constructors, whereas
+- indices are listed /after/ the colon,
+  and their values can vary between constructors.
+
+For the types we are concerned with, we will make use of parameters.
+For example, in the definition of the sum type,
+the two underlying types can be given as parameters to avoid
+repetition in the argument lists of the constructors.
+#+begin_example agda2
+data _⊎_ (A B : Set) : Set where
+  inj₁ : A → A ⊎ B
+  inj₂ : B → A ⊎ B
+#+end_example
+We see here our first /infix/ operator; underscores in Agda names
+indicate the positions of arguments —in the absence of underscores,
+arguments are written postfix.
+In fact, Agda supports /mixfix/ operators, such as ~if_then_else_~.
+Arguments may always be provided postfix by including the underscores,
+as in ~_⊎_ Bool ℕ~, or we may /section/ an operator, partially applying it,
+as in ~Bool ⊎_~ or ~_⊎ ℕ~.
+
+But in fact, to be flexible, we want to use of
+a more general sort that ~Set~.
+The hierarchy of sorts in Agda are indexed by the ~Level~ type;
+here we import that type, the least upper bound operation ~_⊔_~ on levels,
+and the /zero/ level ~ℓ₀~ and /level successor/ operator ~ℓsuc~;
+for these last two, we are using our own name to avoid
+confusion between these operators and the constructors for the ~ℕ~ type.
+#+begin_src agda2
+open import Level using (Level ; _⊔_)
+  renaming (zero to ℓ₀ ; suc to ℓsuc)
+#+end_src
+
+Now, we can present the /level polymorphic/ sum type,
+which works for types ~A~ and ~B~ from any universe.
+#+begin_src agda2
+data _⊎_ {ℓᵃ ℓᵇ : Level} (A : Set ℓᵃ) (B : Set ℓᵇ) : Set (ℓᵃ ⊔ ℓᵇ) where
+  inj₁ : A → A ⊎ B
+  inj₂ : B → A ⊎ B
+#+end_src
+We see here our first use of /implicit/ arguments;
+because the type of ~ℓᵃ~ and ~ℓᵇ~ can be inferred from
+the values of ~A~ and ~B~, we mark them implicit by writing them in
+(curly) brackets. Then the user can simply write,
+for instance, ~Bool ⊎ ℕ~, omitting the level arguments,
+or write, for instance, ~_⊎_ {ℓ₀} {ℓ₀} Bool ℕ~ to explicitly provide them.
+
+***** Records – simple and dependent products
+
+For the product type, we will use an alternative construct for defining types;
+the ~record~ keyword, which defines /product types/ and allow us to
+use named fields.
+#+begin_src agda2
+record _×_ {ℓᵃ ℓᵇ : Level} (A : Set ℓᵃ) (B : Set ℓᵇ) : Set (ℓᵃ ⊔ ℓᵇ) where
+  constructor _,_
+  field
+    proj₁ : A
+    proj₂ : B
+#+end_src
+
+For reference, the corresponding data definition would be
+#+begin_example agda2
+data _×_ {ℓᵃ ℓᵇ : Level} (A : Set ℓᵃ) (B : Set ℓᵇ) : Set (ℓᵃ ⊔ ℓᵇ) where
+  _,_ : A → B → A × B
+#+end_example
+and then the projections would be defined as functions
+#+begin_example agda2
+proj₁ : {A B : Set} → A × B → A
+proj₁ (a , _) = a
+
+proj₂ : {A B : Set} → A × B → B
+proj₂ (_ , b) = b
+#+end_example
+
+Agda's records are quite flexible constructs,
+and we will make great use of them later.
+
+The dependent product type is defined quite similarly
+to its non-dependent relative.
+#+begin_src agda2
+record ∃ {ℓᵃ ℓᵇ : Level} (A : Set ℓᵃ) (B : A → Set ℓᵇ)
+        : Set (ℓsuc (ℓᵃ ⊔ ℓᵇ)) where
+  constructor _,_
+  field
+    e : A
+    B-e : B e 
+#+end_src
+
+Now we may write
+#+begin_example agda2
+∃ A B
+#+end_example
+to mean “there exists an element of type ~A~ which satisfies B”, or
+“there exists an ~x~ of type ~A~ such that the type ~B x~ is occupied”.
+
+As is, this can be unwieldly to use; we often need to refer to
+the element in question in the construction of ~B~.
+We can solve this by using an anonymous function to construct ~B~, as in
+#+begin_example agda2
+∃ A (λ x → B)
+#+end_example
+but the order of ~A~, ~x~ and ~B~ differ from our reading
+and the usual mathematical notation; specifically, ~x~ should come before ~A~.
+
+Thankfully, Agda has a construct to account for this;
+the ~syntax~ keyword establishes alternative syntax
+in which the order of arguments and/or variables can be rearranged.
+#+begin_src agda2
+syntax ∃ A (λ x → B) = ∃ x ∶ A • B
+#+end_src
+With this, the above definition using a ~λ~ becomes
+#+begin_example agda2
+∃ x ∶ A • B
+#+end_example
+
+***** Simple and dependent function types
+
+Now, compared to the previous types, our implementations
+of the simple and dependent function types
+are a bit of a “hack”. There is not an obvious way
+to encode a function as an Agda type,
+so we simply encapsulate the builtin function types.
+We call the constructor ~code~ to reflect this.
+#+begin_src agda2
+data _⟶_ {ℓᵃ ℓᵇ : Level} (A : Set ℓᵃ) (B : Set ℓᵇ)
+        : Set (ℓᵃ ⊔ ℓᵇ) where
+  code : (A → B) → (A ⟶ B)
+
+data Π {ℓᵃ ℓᵇ : Level} (A : Set ℓᵃ) (B : A → Set ℓᵇ)
+     : Set (ℓᵃ ⊔ ℓᵇ) where
+  code : ((e : A) → B e) → Π A B
+#+end_src
+
+As with the dependent product, we use a ~syntax~ declaration
+to enable the usual form of the ~Π~ type.
+#+begin_src agda2
+syntax Π A (λ x → B) = Π x ∶ A • B
+#+end_src
+
+We also introduce ~exec~ functions to “unwrap” the encapsulated
+functions. 
+#+begin_src agda2
+exec : {ℓᵃ ℓᵇ : Level} → {A : Set ℓᵃ} {B : Set ℓᵇ}
+     → A ⟶ B → A → B
+exec (code f) a = f a
+
+exec′ : {ℓᵃ ℓᵇ : Level} → {A : Set ℓᵃ} {B : A → Set ℓᵇ}
+     → Π a ∶ A • B a → (a : A) → B a
+exec′ (code f) a = f a
+#+end_src
+
+***** Logical not and equivalence
+
+As in the preceding section, we define the logical not and equivalence
+operators as shorthands for combinations of the above operators.
+#+begin_src agda2
+¬_ : {ℓ : Level} → Set ℓ → Set ℓ
+¬ A = A ⟶ ⊥
+
+_↔_ : {ℓᵃ ℓᵇ : Level} → Set ℓᵃ → Set ℓᵇ → Set (ℓᵃ ⊔ ℓᵇ)
+A ↔ B = (A ⟶ B) × (B ⟶ A)
+#+end_src
+
+***** Testing the Agda types
+
+Herein we show some example encodings of propositions using our types.
+For this, we will work in the domain of the natural numbers.
+#+begin_src agda2
+module Tests where
+
+  data ℕ : Set where
+    zero : ℕ
+    suc : ℕ → ℕ
+#+end_src
+
+Let us state here that the purpose of this section is to prove that
+our type definitions are sane, not to present pretty proofs.
+Indeed, the below definitions and proof are decidedly not pretty;
+the “encapsulating” and “unwrapping” we use for our function types
+makes the code difficult to very difficult to follow.
+
+More than that, when defining functions using recursion,
+the encapsulation and unwrapping we use prevents the termination checker
+from verifying that our functions terminate.
+To get around this, we provide a means to define our function types
+through explicit primitive recursive definitions
+—that is, by specifying the base case function used for the right side
+of the recursive case.
+To write the definition of this primitive recursion function,
+we must use a corresponding Agda definition; after this definition though,
+we will not have to resort to writing actual Agda functions.
+#+begin_src agda2
+  prim-rec : {ℓᵇ : Level} → {B : Set ℓᵇ}
+           → (b : B)
+           → (r : (ℕ × B) ⟶ B)
+           → ℕ ⟶ B
+  prim-rec b (code r) = code (→-prim-rec b r)
+    where
+      →-prim-rec : {ℓᵇ : Level} → {B : Set ℓᵇ}
+                 → (b : B)
+                 → (r : (ℕ × B) → B)
+                 → ℕ → B
+      →-prim-rec b _ zero = b
+      →-prim-rec b r (suc n) = r (n , →-prim-rec b r n)
+#+end_src
+
+We also need a dependently typed version;
+unfortunately, Agda does not allow overloading
+—except of constructor names—
+so we resort to naming this version ~prim-rec′~.
+#+begin_src agda2
+  prim-rec′ : {ℓᵇ : Level} → {B : ℕ → Set ℓᵇ}
+           → (b : B zero)
+           → (r : Π m ∶ ℕ • (B m ⟶ B (suc m)))
+           → Π n ∶ ℕ • B n
+  prim-rec′ b (code r) = code (∀-prim-rec b λ m Bm → exec (r m) Bm)
+    where
+      ∀-prim-rec : {ℓᵇ : Level} → {B : ℕ → Set ℓᵇ}
+                 → (b : B zero)
+                 → (r : (m : ℕ) → B m → B (suc m))
+                 → (n : ℕ) → B n
+      ∀-prim-rec b _ zero = b
+      ∀-prim-rec b r (suc n) = r n (∀-prim-rec b r n)
+#+end_src
+
+Now we may put our primitive recursion construct to the test by defining a predicate.
+Let us define the evenness predicate on natural numbers.
+#+begin_src agda2
+  Even : ℕ ⟶ Set
+  Even = prim-rec ⊤ (code (λ { (_ , pred-even) → ¬ pred-even }))
+#+end_src
+This definition says the zero is even
+—the base case is ~⊤~, “truth”—
+and that a successor of a natural number is even
+only if its predecessor is not.
+
+With that in hand, the oddness predicate is easy to define
+using a logical not.
+#+begin_src agda2
+  Odd : ℕ ⟶ Set
+  Odd = code (λ n → ¬ (exec Even n))
+#+end_src
+
+We can test out the evenness and oddness of various naturals.
+#+begin_src agda2
+  _ : exec Even zero
+  _ = tt
+
+  _ : ¬ (exec Odd zero)
+  _ = code λ ¬⊤ → exec ¬⊤ tt
+
+  _ : exec Odd (suc zero)
+  _ = code (λ ⊤→⊥ → exec ⊤→⊥ tt)
+
+  _ : ¬ (exec Even (suc zero))
+  _ = code (λ ⊤→⊥ → exec ⊤→⊥ tt)
+#+end_src
+
+More generally, we can prove that even numbers follow odd numbers
+and vice-versa.
+#+begin_src agda2
+  even-then-odd : {m : ℕ} → (exec Even m) ⟶ (exec Odd (suc m))
+  odd-then-even : {m : ℕ} → (exec Odd m) ⟶ (exec Even (suc m))
+  even-then-odd = code (λ even-m → code (λ ¬even-m → exec ¬even-m even-m))
+  odd-then-even = code (λ odd-m → odd-m)
+#+end_src
+
+With those lemmas, we can prove that all numbers are even or odd.
+#+begin_src agda2
+  even-or-odd : Π n ∶ ℕ • ((exec Even n) ⊎ (exec Odd n))
+  even-or-odd =
+    prim-rec′
+      (inj₁ tt)
+      (code (λ n → code λ { (inj₁  even-n) → inj₂ (exec (even-then-odd {n}) even-n)
+                          ; (inj₂ ¬even-n) → inj₁ (exec (odd-then-even {n}) ¬even-n) }))
+#+end_src
+
+And we can prove that no number is /both/ even and odd.
+#+begin_src agda2
+  ¬even-and-odd : ¬ ∃ n ∶ ℕ • ((exec Even n) × (exec Odd n))
+  ¬even-and-odd = code (λ { (n , (even-n , ¬even-n)) → exec ¬even-n even-n })
+#+end_src
+
+***** Footnotes                             :ignore:
+
+[fn:universes]
+This “universe hierarchy” allows us to avoid Russell's paradox;
+~Set~ is not a member of ~Set~, but of ~Set₁~.
+Note that /universe polymorphism/ allows us to easily write definitions
+in a “level agnostic” way.
+
+[fn:prop]
+A relatively recent addition to Agda, but a longtime
+and prominent feature of many similar languages such as Coq.
+Refer to the Agda documentation for details:
+[[https://agda.readthedocs.io/en/v2.6.1/language/prop.html]].
+
+** Automata notes
+

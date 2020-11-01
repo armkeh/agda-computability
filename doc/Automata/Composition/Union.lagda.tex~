@@ -1,0 +1,280 @@
+% Created 2020-02-13 Thu 19:04
+% Intended LaTeX compiler: lualatex
+\documentclass[11pt]{article}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\author{Mark Armstrong}
+\date{\today}
+\title{“Unions” of nondeterministic automata}
+\hypersetup{
+   pdfauthor={Mark Armstrong},
+   pdftitle={“Unions” of nondeterministic automata},
+   pdfkeywords={},
+   pdfsubject={Composing NDA's into a machine which accepts a union of their accepted languages.},
+   pdfcreator={Emacs 28.0.50 (Org mode 9.3.5)},
+   pdflang={English},
+   colorlinks,
+   linkcolor=blue,
+   citecolor=blue,
+   urlcolor=blue
+   }
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+
+\section{Introduction}
+\label{sec:org03b13b9}
+
+We can “union” two NDA's, say \texttt{M} and \texttt{N}; 
+the resulting NDA, \texttt{M ∪ N} should accept the union of the languages
+accepted by \texttt{M} and \texttt{N}.
+
+\section{Unions of canonical nondeterministic automata}
+\label{sec:org8e44d54}
+
+As a reminder, our canonical representation of
+nondeterministic automata
+\begin{itemize}
+\item may have multiple start and final states, but
+\item do not have ε-transitions.
+\end{itemize}
+
+\subsection{Impact of canonical representation features}
+\label{sec:orgfe957e6}
+
+The allowance for multiple start and final states
+make the definition of the “union” machine quite simple;
+informally, given machines
+\begin{center}
+\includegraphics[width=.9\linewidth]{images/union-pre.png}
+\end{center}
+we form the machine
+\begin{center}
+\includegraphics[width=.9\linewidth]{images/union.png}
+\end{center}
+with no additional states.
+\begin{center}
+\includegraphics[width=.9\linewidth]{images/union-pre.png}
+\end{center}
+
+\begin{verbatim}
++----------------------------------+
+| M ∪ N                            |
+|                                  |
+|  +-----------+    +-----------+  |
+|  : M         |    : N         |  |
+|  |           |    |           |  |
+|  |           |    |           |  |
+|  |           |    |           |  |
+|  |           |    |           |  |
+|  +-----------+    +-----------+  |
+|                                  |
++----------------------------------+
+\end{verbatim}
+
+\subsection{The union}
+\label{sec:org5d4de66}
+
+Given NDA's \texttt{M} and \texttt{N}, we will define an NDA \texttt{M ∪ N} such that 
+\begin{itemize}
+\item the set of states of \texttt{M ∪ N} is the disjoint union of
+the sets of states of \texttt{M} and \texttt{N},
+\item the set of start (final) states of \texttt{M ∪ N} is the union of
+the sets of start (final) states of \texttt{M} and \texttt{N}, and
+\item the transition function of \texttt{M ∪ N} contains the transitions
+from \texttt{M} and from \texttt{N}, and no others.
+\end{itemize}
+It should be intuitive that this machine accepts the union
+of the languages accepted by \texttt{M} and \texttt{N}, and this is proven
+afterwards.
+\begin{verbatim}
+_∪_ : (M : NDA Σ) → (N : NDA Σ) → NDA Σ
+⟨ Q₁ , S₁ , F₁ , Δ₁ ⟩ ∪ ⟨ Q₂ , S₂ , F₂ , Δ₂ ⟩ = ⟨ Q , S , F , Δ ⟩
+  where
+    Q : Set _
+    Q = Q₁ ⊎ Q₂
+
+    S : Q → Set _
+    S (inj₁ q) = S₁ q
+    S (inj₂ q) = S₂ q
+
+    F : Q → Set
+    F (inj₁ q) = F₁ q
+    F (inj₂ q) = F₂ q
+
+    Δ : Q → Σ → Q → Set
+    Δ (inj₁ q) c (inj₁ q′) = Δ₁ q c q′
+    Δ (inj₂ q) c (inj₂ q′) = Δ₂ q c q′
+    {-# CATCHALL #-}
+    Δ _ _ _ = ⊥ -- No connections between the machines
+\end{verbatim}
+
+\section{Proof that \texttt{M ∪ N} is a union}
+\label{sec:org06b1ce8}
+
+We wish to prove that \texttt{M ∪ N} is in fact the “union” of \texttt{M} and \texttt{N}.
+Do do so, we must prove, for all strings \texttt{xs},
+\begin{enumerate}
+\item if \texttt{M} \texttt{(\textasciitilde{}N}) accepts \texttt{xs}, then \texttt{M ∪ N} accepts \texttt{xs},
+\item if \texttt{M ∪ N} accepts \texttt{xs}, then at least one of \texttt{M} or \texttt{N} accepts \texttt{xs}.
+\end{enumerate}
+These facts are proven in \ref{sec:org6f1ad26} below.
+
+As stated in \href{./README.org}{the README},
+we must first begin with reasoning about transition chains in \texttt{M ∪ N}.
+Specifically, to prove facts (1)-(2) above, we must show
+\begin{enumerate}
+\item all transition chains in \texttt{M} (\texttt{N}) exist in \texttt{M ∪ N},
+\item any transition chain the union exists in one of \texttt{M} or \texttt{N}, and
+\item there are no transition chains in \texttt{M ∪ N} which connect \texttt{M} and \texttt{N}.
+\end{enumerate}
+Point (c) is needed to eliminate some cases during the proof of (2) above.
+
+\subsection{Transition chains}
+\label{sec:orgf640c08}
+
+\subsubsection{“All transition chains in \texttt{M} (\texttt{N}) exist in the union”}
+\label{sec:orgbc74626}
+
+Note that any transition chain which begins and ends in the same machine
+exists entirely in that machine, so that suffices as an assumption here.
+.
+
+The proof for the “left” machine
+\begin{verbatim}
+M-Δ*⇒M∪N-Δ* : {M N : NDA Σ}
+             → let Q₁ = NDA.Q M
+                   Δ₁* = NDA.Δ* M
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+             → Δ₁* q xs q′
+             → Δ* (inj₁ q) xs (inj₁ q′)
+M-Δ*⇒M∪N-Δ* q [] .q refl = refl
+M-Δ*⇒M∪N-Δ* q (x ∷ xs) q′ (q₀ , Δ₁-q-x-q₀ , Δ₁*-q₀-xs-q′) =
+  inj₁ q₀ , Δ₁-q-x-q₀ , M-Δ*⇒M∪N-Δ* q₀ xs q′ Δ₁*-q₀-xs-q′
+\end{verbatim}
+and for the “right” machine.
+\begin{verbatim}
+N-Δ*⇒M∪N-Δ* : {M N : NDA Σ}
+             → let Q₂ = NDA.Q N
+                   Δ₂* = NDA.Δ* N
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+             → Δ₂* q xs q′
+             → Δ* (inj₂ q) xs (inj₂ q′)
+N-Δ*⇒M∪N-Δ* q [] .q refl = refl
+N-Δ*⇒M∪N-Δ* q (x ∷ xs) q′ (q₀ , Δ₂-q-x-q₀ , Δ₂*-q₀-xs-q′) =
+  inj₂ q₀ , Δ₂-q-x-q₀ , N-Δ*⇒M∪N-Δ* q₀ xs q′ Δ₂*-q₀-xs-q′
+\end{verbatim}
+
+\subsubsection{“Any transition chain in the union exists in the underlying machine”}
+\label{sec:orgd6aa5d4}
+We also need the other direction; any transition chain in a union of two NDA's
+is also in one of those two NDA's.
+
+If both the beginning and the end state belong to the same machine,
+then we can prove that there is a corresponding transition chain
+in that machine. Following this, we will show that the other case
+(the beginning and end states belong to different machines)
+is impossible.
+\begin{verbatim}
+M∪N-Δ*⇒M-Δ* : {M N : NDA Σ}
+             → let Q₁ = NDA.Q M
+                   Δ₁* = NDA.Δ* M
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+             → Δ* (inj₁ q) xs (inj₁ q′)
+             → Δ₁* q xs q′
+M∪N-Δ*⇒M-Δ* q [] .q refl = refl
+M∪N-Δ*⇒M-Δ* q (x ∷ xs) q′ (inj₁ q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  q₀ , Δ-q-x-q₀ , M∪N-Δ*⇒M-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+
+M∪N-Δ*⇒N-Δ* : {M N : NDA Σ}
+             → let Q₂ = NDA.Q N
+                   Δ₂* = NDA.Δ* N
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+             → Δ* (inj₂ q) xs (inj₂ q′)
+             → Δ₂* q xs q′
+M∪N-Δ*⇒N-Δ* q [] .q refl = refl
+M∪N-Δ*⇒N-Δ* q (x ∷ xs) q′ (inj₂ q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  q₀ , Δ-q-x-q₀ , M∪N-Δ*⇒N-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+\end{verbatim}
+
+As we said above, in the case that the beginning and the end state
+belong to different machines, the transition chain could not possible exist.
+We only need the recursive cases here, because the base cases
+are clearly impossible.
+\begin{verbatim}
+M∪N-Δ*-disconnectedˡ : {M N : NDA Σ}
+                     → let Q₁ = NDA.Q M
+                           Q₂ = NDA.Q N
+                           Δ* = NDA.Δ* (M ∪ N) in
+                       (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+                     → ¬ (Δ* (inj₁ q) xs (inj₂ q′))
+M∪N-Δ*-disconnectedˡ q (x ∷ xs) q′ (inj₁ q₀ , _ , Δ*-q₀-xs-q′) =
+  M∪N-Δ*-disconnectedˡ q₀ xs q′ Δ*-q₀-xs-q′
+
+M∪N-Δ*-disconnectedʳ : {M N : NDA Σ}
+                     → let Q₁ = NDA.Q M
+                           Q₂ = NDA.Q N
+                           Δ* = NDA.Δ* (M ∪ N) in
+                       (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+                     → ¬ (Δ* (inj₂ q) xs (inj₁ q′))
+M∪N-Δ*-disconnectedʳ q (x ∷ xs) q′ (inj₂ q₀ , _ , Δ*-q₀-xs-q′) =
+  M∪N-Δ*-disconnectedʳ q₀ xs q′ Δ*-q₀-xs-q′
+\end{verbatim}
+
+\subsection{Acceptance in \texttt{M ∪ N}}
+\label{sec:org6f1ad26}
+
+With the facts we have proven regarding transition chains, we can now
+prove the more specific results about acceptance of strings by NDAs.
+\begin{verbatim}
+M-Accepts⇒M∪N-Accepts : {M N : NDA Σ}
+                      → {n : ℕ} → (xs : Vec Σ n)
+                      → NDA.Accepts M xs
+                      → NDA.Accepts (M ∪ N) xs
+M-Accepts⇒M∪N-Accepts [] (q , S-q , .q , F-q , refl) =
+  inj₁ q , S-q , inj₁ q , F-q , refl
+M-Accepts⇒M∪N-Accepts (x ∷ xs) (q , S-q , q′ , F-q′ , q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  inj₁ q , S-q , inj₁ q′ , F-q′ , inj₁ q₀ , Δ-q-x-q₀ , M-Δ*⇒M∪N-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+
+N-Accepts⇒M∪N-Accepts : {M N : NDA Σ}
+                      → {n : ℕ} → (xs : Vec Σ n)
+                      → NDA.Accepts N xs
+                      → NDA.Accepts (M ∪ N) xs
+N-Accepts⇒M∪N-Accepts [] (q , S-q , .q , F-q , refl) =
+  inj₂ q , S-q , inj₂ q , F-q , refl
+N-Accepts⇒M∪N-Accepts (x ∷ xs) (q , S-q , q′ , F-q′ , q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  inj₂ q , S-q , inj₂ q′ , F-q′ , inj₂ q₀ , Δ-q-x-q₀ , N-Δ*⇒M∪N-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+
+M∪N-Accepts⇒M-Accepts∨N-Accepts : {M N : NDA Σ}
+                                → {n : ℕ} → (xs : Vec Σ n)
+                                → NDA.Accepts (M ∪ N) xs
+                                → NDA.Accepts M xs  ⊎  NDA.Accepts N xs
+M∪N-Accepts⇒M-Accepts∨N-Accepts [] (inj₁ q , S-q , .(inj₁ q) , F-q , refl) =
+  inj₁ (q , S-q , q , F-q , refl)
+M∪N-Accepts⇒M-Accepts∨N-Accepts [] (inj₂ q , S-q , .(inj₂ q) , F-q , refl) =
+  inj₂ (q , S-q , q , F-q , refl)
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs) (inj₁ q , S-q , inj₁ q′ , F-q′ , inj₁ q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  inj₁ (q , S-q , q′ , F-q′ , q₀ , Δ-q-x-q₀ , M∪N-Δ*⇒M-Δ* q₀ xs q′ Δ*-q₀-xs-q′)
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs) (inj₂ q , S-q , inj₂ q′ , F-q′ , inj₂ q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  inj₂ (q , S-q , q′ , F-q′ , q₀ , Δ-q-x-q₀ , M∪N-Δ*⇒N-Δ* q₀ xs q′ Δ*-q₀-xs-q′)
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs) (inj₁ q , _ , inj₂ q′ , _ , inj₁ q₀ , _ , Δ*-q₀-xs-q′) =
+  ⊥-elim (M∪N-Δ*-disconnectedˡ q₀ xs q′ Δ*-q₀-xs-q′)
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs) (inj₂ q , _ , inj₁ q′ , _ , inj₂ q₀ , _ , Δ*-q₀-xs-q′) =
+  ⊥-elim (M∪N-Δ*-disconnectedʳ q₀ xs q′ Δ*-q₀-xs-q′)
+\end{verbatim}
+\end{document}

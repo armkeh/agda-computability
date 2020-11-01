@@ -1,0 +1,212 @@
+#+Title: “Concatenations” of nondeterministic automata
+#+Author: Mark Armstrong
+#+Description: Composing NDA's into a machine which accepts
+#+Description: the concatenation of their accepted languages.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composition/Concatenation.agda
+
+* Introduction
+
+We can “concatenate” two NDA's, say ~M~ and ~N~; 
+the resulting NDA, ~M ∪ N~ should accept the union of the languages
+accepted by ~M~ and ~N~.
+
+* Agda header                                   :noexport:
+
+Notice the module parameter Σ here.
+#+begin_src agda2
+module Automata.Composition.Concatenation (Σ : Set) where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Data.Empty using (⊥ ; ⊥-elim)
+open import Data.Nat using (ℕ)
+open import Data.Sum using (_⊎_ ; inj₁ ; inj₂)
+open import Data.Product using (_,_)
+open import Data.Vec using (Vec ; [] ; _∷_)
+
+open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_ ; refl)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Automata.Nondeterministic
+----------------------------------------------------------------------
+#+end_src
+
+* Compositions of canonical nondeterministic automata
+
+Herein we define the concatenation function.
+
+** Informal description and impact of canonical representation features
+
+As a reminder, our canonical representation of
+nondeterministic automata
+- may have multiple start and final states, but
+- do not have ε-transitions.
+
+If our representation included ε-transitions,
+the definition of the concatenation would be simple;
+we would attach the final states of the first machine
+with the start states of the second machine
+using ε-transitions.
+
+As it stands, our definition is similar, though more complex.
+We introduce an “~intermediate~” state which “mimics”
+all of the final states of the first machine
+and the start states of the second machine.
+By “mimic”, we mean
+- all transitions /into/ the final states of the first machine
+  are duplicated by transitions into the ~intermediate~ state, and
+- all transition of /out of/ the start states of the second machine
+  are duplicated by transitions out of the ~intermediate~ state.
+
+So, given automata
+- ~M~ with start states ~sᴹ₁~, …, ~sᴹᵢ~ and final states ~fᴹ₁~, …, ~fᴹⱼ~, and
+- ~N~ with start states ~sᴺ₁~, …, ~sᴺₖ~ and final states ~fᴺ₁~, …, ~fᴺₗ~,
+pictured
+[[file:images/concat-preM.png]]
+and here
+[[file:images/concat-preN.png]]
+the concatenation ~M ++ N~ of the two is
+[[file:images/concatenation.png]]
+(We use dotted states and transitions to indicate /sets of/ states
+and transitions, and the labels ~Cᵢ~ to stand in for
+the /sets of/ elements of ~Σ~ labelling those transitions).
+:IMAGESRC:
+#+begin_src ditaa :exports none :file images/concat-preM.png
++---------------------------------------+
+| M                                     |
+|                                       |
+|    +-----+         +-----+    /-----\ |
+|    | {o} |         : {o} | C₁ |     | |
+| -->+ sᴹ₁ |    …    |     +=-->+ fᴹ₁ | |
+|    |     |         |     |    |     | |
+|    +-----+         +-----+    \-----/ |
+|                                       |
+|       ⋮       …                  ⋮    |
+|                                       |
+|    +-----+         +-----+    /-----\ |
+|    | {o} |         : {o} | C₂ |     | |
+| -->+ sᴹᵢ |    …    |     +=-->+ fᴹⱼ | |
+|    |     |         |     |    |     | |
+|    +-----+         +-----+    \-----/ |
+|                                       |
++---------------------------------------+
+#+end_src
+
+#+RESULTS:
+[[file:images/concat-preM.png]]
+
+#+begin_src ditaa :exports none :file images/concat-preN.png
++---------------------------------------+
+| N                                     |
+|                                       |
+|    +-----+    +-----+         /-----\ |
+|    | {o} | C₃ : {o} |         |     | |
+| -->+ sᴺ₁ +=-->+     |    …    | fᴺ₁ | |
+|    |     |    |     |         |     | |
+|    +-----+    +-----+         \-----/ |
+|                                       |
+|       ⋮          ⋮       …       ⋮    |
+|                                       |
+|    +-----+    +-----+         /-----\ |
+|    | {o} | C₄ : {o} |         |     | |
+| -->+ sᴺₖ +=-->+     |    …    | fᴺₗ | |
+|    |     |    |     |         |     | |
+|    +-----+    +-----+         \-----/ |
+|                                       |
++---------------------------------------+
+#+end_src
+
+#+RESULTS:
+[[file:images/concat-preN.png]]
+
+#+begin_src ditaa :exports none :file images/concatenation.png
++----------------------------------------------------------------------------------------------------------------------+
+| M ++ N                                                                                                               |
+|                                                                                                                      |
+| +-----------------------------------------+                             +-----------------------------------------+  |
+| : M                                       |                             : N                                       |  |
+| |    +-----+           +-----+    +-----+ |                             |    +-----+    +-----+           /-----\ |  |
+| |    | {o} |           : {o} | C₁ | {o} | |                             |    | {o} | C₃ : {o} |           |     | |  |
+| | -->+ sᴹ₁ |     …     |     +=-->+ fᴹ₁ | |                             |    | sᴺ₁ +--->|     |     …     | fᴺ₁ | |  |
+| |    |     |           |     |    |     | |                             |    |     |    |     |           |     | |  |
+| |    +-----+           +--+--+    +-----+ |      +--------------+       |    +-----+    +-----+           \-----/ |  |
+| |                         |               |      | {o}          |       |                  ^                      |  |
+| |                         |    C₁         |      |              |  C₃   |                  |                      |  |              
+| |                         \=--------------|=---->+              +=------|=-----------------/                      |  |
+| |                                         |      |              |       |                                         |  |
+| |                                         |      |              |       |                                         |  |
+| |       ⋮                 ⋮          ⋮    |      | intermediate |       |       ⋮          ⋮                 ⋮    |  |
+| |                                         |      |              |       |                                         |  |
+| |                                         |      |              |       |                                         |  |
+| |                         /=--------------|=---->+              +=------|=-----------------\                      |  |
+| |                         |    C₂         |      |              |  C₄   |                  |                      |  |
+| |                         |               |      |              |       |                  v                      |  |
+| |    +-----+           +--+--+    +-----+ |      +--------------+       |    +-----+    +--+--+           /-----\ |  |
+| |    | {o} |           : {o} | C₂ | {o} | |                             |    | {o} | C₄ : {o} |           |     | |  |
+| | -->+ sᴹᵢ |     …     |     +=-->+ fᴹⱼ | |                             |    | sᴺₖ +--->|     |     …     | fᴺₗ | |  |
+| |    |     |           |     |    |     | |                             |    |     |    |     |           |     | |  |
+| |    +-----+           +-----+    +-----+ |                             |    +-----+    +-----+           \-----/ |  |
+| |                                         |                             |                                         |  |
+| +-----------------------------------------+                             +-----------------------------------------+  |
+|                                                                                                                      |
++----------------------------------------------------------------------------------------------------------------------+
+#+end_src
+
+#+RESULTS:
+[[file:images/concatenation.png]]
+
+:END:
+
+There are some subtleties regarding start and final states
+we must consider, which are not captured
+by the above diagram;
+- if any final state of the first machine is also a start state,
+  then the ~intermediate~ state must also be a start state, and
+- if any start state of the second machine is also a final state,
+  then the ~intermediate~ state must also be a final state.
+
+** The concatenation
+
+Given NDA's ~M~ and ~N~, we will define an NDA ~M ++ N~ such that 
+- the set of states of the concatenation is the disjoint union of
+  the sets of states of ~M~ and ~N~, plus a state 
+- the set of start states of the concatenation is
+  the set of start states of ~M~,
+- the set of final states of the concatenation is
+  the set of final states of ~N~, and
+- the transition function contains the transitions from ~M~ and from ~N~,
+  as well as a “duplicate” transitions connecting the final states
+  of ~M~ to states to which a start state of ~N~ is connected.
+
+#+begin_src agda2
+
+    _++_ : (M N : NDA |Σ|) → NDA |Σ|
+    ⟨ Q₁ , S₁ , F₁ , Δ₁ ⟩ ++ ⟨ Q₂ , S₂ , F₂ , Δ₂ ⟩ = ⟨ Q , S , F , Δ ⟩
+      where
+        Q : Set
+        Q = Maybe (Q₁ ⊎ Q₂)
+
+        S : Q → Set
+        S (q ∶M) = S₁ q
+        S (_ ∶N) = ⊥
+        S intermediate = ∃ q ∶ Q₁ • (S₁ q × F₁ q)
+
+        F : Q → Set
+        F (_ ∶M) = ⊥
+        F (q ∶N) = F₂ q
+        F intermediate = ∃ q ∶ Q₂ • (S₂ q × F₂ q)
+
+        Δ : Q → Σ → Q → Set
+        Δ (q ∶M) c (q′ ∶M) = Δ₁ q c q′
+        Δ (q ∶N) c (q′ ∶N) = Δ₂ q c q′
+        Δ (q ∶M) c intermediate = ∃ f ∶ Q₁ • (F₁ f × Δ₁ q c f)
+        Δ intermediate c (q′ ∶N) = ∃ s ∶ Q₂ • (S₂ s × Δ₂ s c q′)
+        {-# CATCHALL #-}
+        Δ _ _ _ = ⊥
+#+end_src
+

@@ -1,0 +1,10 @@
+#+Title: “Products” of nondeterministic automata
+#+Author: Mark Armstrong
+#+Description: Composing NDA's into a machine which accepts
+#+Description: the product of their accepted languages.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composition/Product.agda
+
+* Introduction
+
+We can 

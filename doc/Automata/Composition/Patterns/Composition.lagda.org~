@@ -1,0 +1,9 @@
+#+Title: Constructor patterns for the composition of automata
+#+Author: Mark Armstrong
+#+Description: 
+
+Our composition of NDA's includes, as states,
+- the states of the first machine,
+- the states of the second machine, and
+- one additional state, called the “~intermediate~” state.
+

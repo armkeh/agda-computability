@@ -1,0 +1,97 @@
+#+Title: “Intersections” of nondeterministic automata
+#+Author: Mark Armstrong
+#+Description: Composing NDA's into a machine which accepts
+#+Description: the intersection of their accepted languages.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composition/Intersection.agda
+
+* Introduction
+
+We can combine two NDA's, say ~M~ and ~N~,
+into a “intersection machine” ~M ∩ N~.
+
+* Agda header                                   :noexport:
+
+Notice the module parameters Σ₁ and Σ₂ here.
+#+begin_src agda2
+module Automata.Composition.Intersection (Σ : Set) where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Data.Nat using (ℕ)
+open import Data.Product using (_×_ ; _,_)
+open import Data.Vec using (Vec ; [] ; _∷_)
+
+open import Relation.Binary.PropositionalEquality using (refl)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Automata.Nondeterministic
+----------------------------------------------------------------------
+#+end_src
+
+* Products of canonical nondeterministic automata
+
+#+begin_src agda2
+_∩_ : (M N : NDA Σ) → NDA Σ
+⟨ Q₁ , S₁ , F₁ , Δ₁ ⟩ ∩ ⟨ Q₂ , S₂ , F₂ , Δ₂ ⟩ = ⟨ Q , S , F , Δ ⟩
+  where
+    Q : Set
+    Q = Q₁ × Q₂
+
+    S : Q → Set
+    S (q , r) = S₁ q × S₂ r
+
+    F : Q → Set
+    F (q , r) = F₁ q × F₂ r
+
+    Δ : Q → Σ → Q → Set
+    Δ (q , r) c (q′ , r′) = Δ₁ q c q′ × Δ₂ r c r′ 
+#+end_src
+
+* Proving that ~M ∩ N~ is an intersection
+
+** Transition paths
+
+#+begin_src agda2
+AllPaths : {!!}
+AllPaths = {!!}
+#+end_src
+
+#+begin_src agda2
+OnlyPaths₁ : {M N : NDA Σ}
+           → {!!}
+OnlyPaths₁ = {!!}
+#+end_src
+
+#+begin_src agda2
+
+#+end_src
+
+** Acceptance
+
+#+begin_src agda2
+AcceptsAll : {!!}
+AcceptsAll = {!!}
+#+end_src
+
+#+begin_src agda2
+AcceptsOnly₁ : {M N : NDA Σ}
+             → {n : ℕ}
+             → (xs : Vec Σ n)
+             → NDA.Accepts (M ∩ N) xs
+             → NDA.Accepts M xs
+AcceptsOnly₁ xs ((q , _) , (Sq , _) , (q′ , _) , (Fq′ , _) , Δ*-[q,□]-xs-[q′,□])=
+  q , Sq , q′ , Fq′ , {!!}
+#+end_src
+
+#+begin_src agda2
+AcceptsOnly₂ : {M N : NDA Σ}
+             → {n : ℕ}
+             → (xs : Vec Σ n)
+             → NDA.Accepts (M ∩ N) xs
+             → NDA.Accepts N xs
+AcceptsOnly₂ xs ((_ , r) , (_ , Sr) , (_ , r′) , (_ , Fr′) , Δ*-[□,r]-xs-[□,r′]) =
+  r , Sr , r′ , Fr′ , {!!}
+#+end_src

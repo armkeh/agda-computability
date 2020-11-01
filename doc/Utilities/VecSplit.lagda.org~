@@ -1,0 +1,12 @@
+#+Title: Vector splitting
+#+Author: Mark Armstrong
+#+Description: A datatype for splitting Vectors into two parts.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../src/Utilities/VecSplit.agda
+
+* Introduction
+
+During proofs about concatenation of automata, we need to prove
+that the concatenated machines accepts only the concatenation
+of the two languages, which involves finding a way to
+split the

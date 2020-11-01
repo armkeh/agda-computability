@@ -1,0 +1,409 @@
+#+Title: “Unions” of nondeterministic automata
+#+Author: Mark Armstrong
+#+Description: Composing NDA's into a machine which accepts
+#+Description: the union of their accepted languages.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composition/Union.agda
+
+* Introduction
+
+We can “union” two NDA's, say ~M~ and ~N~; 
+the resulting NDA, ~M ∪ N~ should accept the union of the languages
+accepted by ~M~ and ~N~.
+
+* Agda header                                   :noexport:
+
+Notice the module parameter Σ here.
+#+begin_src agda2
+module Automata.Composition.Union (Σ : Set) where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Data.Empty using (⊥ ; ⊥-elim)
+open import Data.Nat using (ℕ)
+open import Data.Sum using (_⊎_ ; inj₁ ; inj₂)
+open import Data.Product using (_,_)
+open import Data.Vec using (Vec ; [] ; _∷_)
+
+open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_ ; refl)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Automata.Nondeterministic
+----------------------------------------------------------------------
+#+end_src
+
+* Unions of canonical nondeterministic automata
+
+Herein we provide an informal description of the union,
+followed by a formal description and definition.
+
+** Informal description and impact of canonical representation features
+
+As a reminder, our canonical representation of
+nondeterministic automata
+- may have multiple start and final states, but
+- do not have ε-transitions.
+
+The allowance for multiple start and final states
+make the definition of the “union” machine quite simple.
+
+Informally, given two automata
+[[file:images/union-pre.png]]
+we form the machine
+[[file:images/union.png]]
+with no additional states.
+:IMAGESRC:
+#+begin_src ditaa :exports none :file images/union-pre.png
++-----------+    +-----------+
+| M         |    | N         |
+|           |    |           |
+|           |    |           |
+|           |    |           |
+|           |    |           |
++-----------+    +-----------+
+#+end_src
+
+#+begin_src ditaa :exports none :file images/union.png
++----------------------------------+
+| M ∪ N                            |
+|                                  |
+|  +-----------+    +-----------+  |
+|  : M         |    : N         |  |
+|  |           |    |           |  |
+|  |           |    |           |  |
+|  |           |    |           |  |
+|  |           |    |           |  |
+|  +-----------+    +-----------+  |
+|                                  |
++----------------------------------+
+#+end_src
+:END:
+
+** The union
+
+Given NDA's ~M~ and ~N~, we will define an NDA ~M ∪ N~ such that:
+- The set of states of ~M ∪ N~ is the disjoint union of
+  the sets of states of ~M~ and ~N~.
+- The set of start (final) states of ~M ∪ N~ is the union of
+  the sets of start (final) states of ~M~ and ~N~.
+- The transition function of ~M ∪ N~ contains the transitions
+  from ~M~ and from ~N~, and no others.
+It should be intuitive that this machine accepts the union
+of the languages accepted by ~M~ and ~N~, and this is proven
+afterwards.
+#+begin_src agda2
+_∪_ : (M : NDA Σ) → (N : NDA Σ) → NDA Σ
+⟨ Q₁ , S₁ , F₁ , Δ₁ ⟩ ∪ ⟨ Q₂ , S₂ , F₂ , Δ₂ ⟩ = ⟨ Q , S , F , Δ ⟩
+  where
+    Q : Set _
+    Q = Q₁ ⊎ Q₂
+
+    S : Q → Set _
+    S (inj₁ q) = S₁ q
+    S (inj₂ q) = S₂ q
+
+    F : Q → Set
+    F (inj₁ q) = F₁ q
+    F (inj₂ q) = F₂ q
+
+    Δ : Q → Σ → Q → Set
+    Δ (inj₁ q) c (inj₁ q′) = Δ₁ q c q′
+    Δ (inj₂ q) c (inj₂ q′) = Δ₂ q c q′
+    {-# CATCHALL #-}
+    Δ _ _ _ = ⊥ -- No connections between the machines
+#+end_src
+
+* Proving that ~M ∪ N~ is a union
+
+We wish to prove that ~M ∪ N~ is in fact the “union” of ~M~ and ~N~.
+To do so, we must prove, for all strings ~xs~,
+1. if ~M~ ~(~N~) accepts ~xs~, then ~M ∪ N~ accepts ~xs~,
+2. if ~M ∪ N~ accepts ~xs~, then at least one of ~M~ or ~N~ accepts ~xs~.
+These facts are proven in [[Acceptance in ~M ∪ N~]] below.
+
+As stated in [[file:./README.org::Reasoning about compositions][the README]],
+we must first begin with reasoning about transition chains in ~M ∪ N~.
+Specifically, to prove facts (1) and (2) above, we must show
+a. all transition chains in ~M~ (~N~) exist in ~M ∪ N~,
+b. any transition chain in ~M ∪ N~ exists in one of ~M~ or ~N~, and
+c. there are no transition chains in ~M ∪ N~ which connect ~M~ and ~N~.
+Point (c) is needed to eliminate some cases during the proof of (2) above.
+
+** Transition chains
+
+The proofs herein are relatively straightforward;
+they mostly involving “wrapping” or “unwrapping” of the states
+(into or from a disjoint union).
+
+As discussed in  [[file:./README.org::Reasoning about compositions][the README]],
+to some extent this simplicity is a testament that
+our choices of specific features for canonical form for NDA's
+were well made.
+
+For the most part, these are simple recursive proofs.
+We are given proof of a transition chain in one machine,
+and asked to prove a related chain occurs in another machine.
+We case split on the string labelling the transition chain;
+in the base case, when it is empty, the “beginning” and “ending”
+states must be the same, and the required proof is trivial.
+In the inductive case, we “wrap” or “unwrap” the states in the
+provided chain to obtain the required chain.
+
+*** “All transition chains in ~M~ (~N~) exist in the union”
+
+These two proofs exemplify the pattern described above.
+
+The proof for the “left” machine, ~M~,
+#+begin_src agda2
+M-Δ*⇒M∪N-Δ* : {M N : NDA Σ}
+             → let Q₁ = NDA.Q M
+                   Δ₁* = NDA.Δ* M
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+             → Δ₁* q xs q′
+             → Δ* (inj₁ q) xs (inj₁ q′)
+M-Δ*⇒M∪N-Δ* q [] .q refl = refl
+M-Δ*⇒M∪N-Δ* q (x ∷ xs) q′ (q₀ , Δ₁-q-x-q₀ , Δ₁*-q₀-xs-q′) =
+  inj₁ q₀ , Δ₁-q-x-q₀ , M-Δ*⇒M∪N-Δ* q₀ xs q′ Δ₁*-q₀-xs-q′
+#+end_src
+and for the “right” machine, ~N~.
+#+begin_src agda2
+N-Δ*⇒M∪N-Δ* : {M N : NDA Σ}
+             → let Q₂ = NDA.Q N
+                   Δ₂* = NDA.Δ* N
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+             → Δ₂* q xs q′
+             → Δ* (inj₂ q) xs (inj₂ q′)
+N-Δ*⇒M∪N-Δ* q [] .q refl = refl
+N-Δ*⇒M∪N-Δ* q (x ∷ xs) q′ (q₀ , Δ₂-q-x-q₀ , Δ₂*-q₀-xs-q′) =
+  inj₂ q₀ , Δ₂-q-x-q₀ , N-Δ*⇒M∪N-Δ* q₀ xs q′ Δ₂*-q₀-xs-q′
+#+end_src
+
+*** “Any transition chain in ~M ∪ N~ exists in one of ~M~ or ~N~” 
+
+These proofs are “inverse” to the one above.
+
+Here we assume both the beginning and the end state
+belong to the same machine (~M~ in the first proof, ~N~ in the second)..
+
+If the beginning and end state belong to different machines,
+there is in fact no possible transition chain; this is shown in
+the proof of (c) below.
+
+As above, we have a proof for the “left” machine, ~M~,
+#+begin_src agda2
+M∪N-Δ*⇒M-Δ* : {M N : NDA Σ}
+             → let Q₁ = NDA.Q M
+                   Δ₁* = NDA.Δ* M
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+             → Δ* (inj₁ q) xs (inj₁ q′)
+             → Δ₁* q xs q′
+M∪N-Δ*⇒M-Δ* q [] .q refl = refl
+M∪N-Δ*⇒M-Δ* q (x ∷ xs) q′ (inj₁ q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  q₀ , Δ-q-x-q₀ , M∪N-Δ*⇒M-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+and for the “right” machine, ~N~.
+#+begin_src agda2
+M∪N-Δ*⇒N-Δ* : {M N : NDA Σ}
+             → let Q₂ = NDA.Q N
+                   Δ₂* = NDA.Δ* N
+                   Δ* = NDA.Δ* (M ∪ N) in
+               (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+             → Δ* (inj₂ q) xs (inj₂ q′)
+             → Δ₂* q xs q′
+M∪N-Δ*⇒N-Δ* q [] .q refl = refl
+M∪N-Δ*⇒N-Δ* q (x ∷ xs) q′ (inj₂ q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  q₀ , Δ-q-x-q₀ , M∪N-Δ*⇒N-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+:TODO: I'm unhappy with these names; they “promise too much”. But they are brief.
+
+*** “There are no transition chains in ~M ∪ N~ which connect ~M~ and ~N~” 
+
+As we said above, in the case that the beginning and the end state
+belong to different machines, the transition chain could not possible exist.
+
+We only need the recursive cases here, because the base cases
+are clearly impossible. The contradiction in the recursive case
+comes from the recursive call (i.e., the induction hypothesis.)
+
+Once again, there is a proof for the “left” machine ~M~,
+#+begin_src agda2
+M∪N-Δ*-disconnectedˡ : {M N : NDA Σ}
+                     → let Q₁ = NDA.Q M
+                           Q₂ = NDA.Q N
+                           Δ* = NDA.Δ* (M ∪ N) in
+                       (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+                     → ¬ (Δ* (inj₁ q) xs (inj₂ q′))
+M∪N-Δ*-disconnectedˡ q (x ∷ xs) q′ (inj₁ q₀ , _ , Δ*-q₀-xs-q′) =
+  M∪N-Δ*-disconnectedˡ q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+and for the “right” machine ~N~.
+#+begin_src agda2
+M∪N-Δ*-disconnectedʳ : {M N : NDA Σ}
+                     → let Q₁ = NDA.Q M
+                           Q₂ = NDA.Q N
+                           Δ* = NDA.Δ* (M ∪ N) in
+                       (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+                     → ¬ (Δ* (inj₂ q) xs (inj₁ q′))
+M∪N-Δ*-disconnectedʳ q (x ∷ xs) q′ (inj₂ q₀ , _ , Δ*-q₀-xs-q′) =
+  M∪N-Δ*-disconnectedʳ q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+:TODO: These names are also not quite ideal.
+
+** Acceptance in ~M ∪ N~
+
+We now return to our initial goal: to prove that ~M ∪ N~ does,
+in fact, accept ~L(M) ∪ L(N)~.
+
+As with the proofs in [[Transition chains]],
+the proofs here are relatively straightforward.
+The nature of the ~Accepts~ relation means we have a decent number
+of arguments to deal with; that is the only source of difficulty,
+and it is alleviated if we properly document them.
+
+*** “If ~M~ ~(~N~) accepts ~xs~, then ~M ∪ N~ accepts ~xs~”
+
+We layout the code to emphasise the relation between the proof
+of ~Accepts M xs~ and ~Accepts (M ∪ N) xs~; as stated, the proof is
+not particularly difficult, once we account for all arguments.
+#+begin_src agda2
+M-Accepts⇒M∪N-Accepts : {M N : NDA Σ}
+                      → {n : ℕ} → (xs : Vec Σ n)
+                      → NDA.Accepts M xs
+                      → NDA.Accepts (M ∪ N) xs
+M-Accepts⇒M∪N-Accepts [] (q , S-q , .q , F-q , refl) =
+  inj₁ q , S-q , inj₁ q , F-q , refl
+M-Accepts⇒M∪N-Accepts (x ∷ xs)
+  ( q  , S-q         -- The beginning state
+  , q′ , F-q′       -- The ending state
+  , q₀ , Δ₁-q-x-q₀   -- The first step
+  , Δ₁*-q₀-xs-q′) =  -- The remaining steps
+  -- Translate to the union:
+    (inj₁ q , S-q        -- The beginning state
+    , inj₁ q′ , F-q′     -- The ending state
+    , inj₁ q₀ , Δ₁-q-x-q₀  -- The first step
+    , M-Δ*⇒M∪N-Δ* q₀ xs q′ Δ₁*-q₀-xs-q′)   -- The remaining steps (applying I.H.)
+#+end_src
+
+The proof for the “right” machine, ~N~, is nearly identical.
+#+begin_src agda2
+N-Accepts⇒M∪N-Accepts : {M N : NDA Σ}
+                      → {n : ℕ} → (xs : Vec Σ n)
+                      → NDA.Accepts N xs
+                      → NDA.Accepts (M ∪ N) xs
+N-Accepts⇒M∪N-Accepts [] (q , S-q , .q , F-q , refl) =
+  inj₂ q , S-q , inj₂ q , F-q , refl
+N-Accepts⇒M∪N-Accepts (x ∷ xs)
+  ( q , S-q
+  , q′ , F-q′
+  , q₀ , Δ-q-x-q₀
+  , Δ*-q₀-xs-q′) =
+    ( inj₂ q , S-q
+    , inj₂ q′ , F-q′
+    , inj₂ q₀ , Δ-q-x-q₀
+    , N-Δ*⇒M∪N-Δ* q₀ xs q′ Δ*-q₀-xs-q′ )
+#+end_src
+
+*** “If ~M ∪ N~ accepts ~xs~, then at least one of ~M~ or ~N~ accepts ~xs~” 
+
+For the inverse statement, rather than two proofs,
+we only have one, whose consequent is a disjunction.
+
+This is because from just the statement “~M ∪ N~ accepts ~xs~”,
+we cannot know which machine accepts ~xs~; we must deconstruct the proof
+to determine this. This is as opposed to
+the proofs regarding transition chains, where we could focus
+on one machine by choosing the states used in the statements.
+
+The proof here is long enough that we break it into several pieces.
+
+The proof statement (type signature) is clear enough.
+:TODO: The name is too long, though.
+#+begin_src agda2 :exports none
+----------------------------------------------------------------------
+#+end_src
+#+begin_src agda2
+M∪N-Accepts⇒M-Accepts∨N-Accepts : {M N : NDA Σ}
+                                → {n : ℕ} → (xs : Vec Σ n)
+                                → NDA.Accepts (M ∪ N) xs
+                                → NDA.Accepts M xs  ⊎  NDA.Accepts N xs
+#+end_src
+
+There are two bases cases (when ~xs~ is the empty string);
+either the single state used in the proof of ~Accepts (M ∪ N) xs~,
+which is both a start and final state,
+is in ~M~ or it is in ~N~; then of course that state is both start and final
+in the machine in question. 
+#+begin_src agda2 :exports none
+-- Base cases.
+#+end_src
+#+begin_src agda2
+M∪N-Accepts⇒M-Accepts∨N-Accepts []
+  (inj₁ q , S-q , .(inj₁ q) , F-q , refl) =
+    inj₁ (q , S-q , q , F-q , refl)
+M∪N-Accepts⇒M-Accepts∨N-Accepts []
+  (inj₂ q , S-q , .(inj₂ q) , F-q , refl) =
+    inj₂ (q , S-q , q , F-q , refl)
+#+end_src
+
+In the first recursive case, both the beginning state and ending state
+in the proof of ~Accepts (M ∪ N) xs~ is in ~M~.
+Then we carefully reconstruct the proof by “unwrapping”
+(the dual of the “wrapping” we did in the inverse proofs above).
+#+begin_src agda2 :exports none
+-- Induction step 1: both the start and final state are in M.
+#+end_src
+#+begin_src agda2
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs)
+  ( inj₁ q  , S-q
+  , inj₁ q′ , F-q′
+  , inj₁ q₀ , Δ-q-x-q₀
+  , Δ*-q₀-xs-q′) =
+    inj₁ ( q , S-q
+         , q′ , F-q′
+         , q₀ , Δ-q-x-q₀
+         , M∪N-Δ*⇒M-Δ* q₀ xs q′ Δ*-q₀-xs-q′)
+#+end_src
+
+The second recursive case, when both states are in ~N~, is similar.
+#+begin_src agda2 :exports none
+-- Induction step 2: both the start and final state are in N.
+#+end_src
+#+begin_src agda2
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs)
+  ( inj₂ q  , S-q
+  , inj₂ q′ , F-q′
+  , inj₂ q₀ , Δ-q-x-q₀
+  , Δ*-q₀-xs-q′) =
+    inj₂ ( q  , S-q
+         , q′ , F-q′
+         , q₀ , Δ-q-x-q₀
+         , M∪N-Δ*⇒N-Δ* q₀ xs q′ Δ*-q₀-xs-q′)
+#+end_src
+
+The remaining recursive cases, when the beginning state and ending state
+in the proof of ~Accepts (M ∪ N) xs~ are in different machines,
+are both impossible, from what we have proven about transition chains.
+#+begin_src agda2 :exports none
+-- Unreachable cases: the proof of “Accepts (M ∪ N) xs”
+-- asserts M and N are connected.
+#+end_src
+#+begin_src agda2
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs)
+  (inj₁ q , _ , inj₂ q′ , _ , inj₁ q₀ , _ , Δ*-q₀-xs-q′) =
+    ⊥-elim (M∪N-Δ*-disconnectedˡ q₀ xs q′ Δ*-q₀-xs-q′)
+M∪N-Accepts⇒M-Accepts∨N-Accepts (x ∷ xs)
+  (inj₂ q , _ , inj₁ q′ , _ , inj₂ q₀ , _ , Δ*-q₀-xs-q′) =
+    ⊥-elim (M∪N-Δ*-disconnectedʳ q₀ xs q′ Δ*-q₀-xs-q′)
+#+end_src
+#+begin_src agda2 :exports none
+----------------------------------------------------------------------
+#+end_src

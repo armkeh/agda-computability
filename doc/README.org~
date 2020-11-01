@@ -1,0 +1,9 @@
+#+Title: Literate, documented source code
+#+Author: Mark Armstrong
+#+Description: 
+
+This directory contains the raw Agda source files,
+“tangled” from the files in [[file:./../doc/][the ~doc~ folder]].
+
+Be aware that if changes are made to these files, they will be lost
+if the files are tangled from ~doc~ again.

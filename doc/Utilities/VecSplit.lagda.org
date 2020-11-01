@@ -1,0 +1,71 @@
+#+Title: Vector splitting
+#+Author: Mark Armstrong
+#+Description: A record for splitting Vectors into two parts.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../src/Utilities/VecSplit.agda
+
+* Introduction
+
+During proofs about concatenation of automata, we need to prove
+that the concatenated machines accepts only the concatenation
+of the two languages, which involves finding a way to
+split “strings” (vectors of characters) into two parts.
+We do not know ahead of time the length of the two parts.
+
+This seems like a reproducible need, so we introduce here
+a record for splitting up vectors.
+
+One particular advantage to this record is we can make
+the lengths of the two sub-vectors implicit fields
+without this record, the user would be required to
+explicitly existentially quantify over the lengths.
+
+* Agda header                                   :noexport:
+
+#+begin_src agda2
+module Utilities.VecSplit where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Level using (Level)
+open import Data.Nat using (ℕ ; _+_)
+open import Data.Vec using (Vec ; _++_)
+
+open import Relation.Binary.PropositionalEquality
+  using (_≡_)
+open import Relation.Binary.HeterogeneousEquality
+  using (_≅_)
+----------------------------------------------------------------------
+#+end_src
+
+* A split of two vectors
+
+A split consists, essentially, of three pieces: the two sub-vectors
+along with a proof that their catenation is equal to the original vector.
+
+Of course, it's not quite that simple;
+we also need
+- the lengths of those subvectors, and
+- a proof that the lengths add to the length of the original vector.
+
+Of all of those, the lengths themselves should never need to
+be explicitely written, so we make them implicit fields.
+The ability to make these implicit is the advantage of using a record
+rather than simply a (dependent) product.
+
+Comparing this with the standard library's ~splitAt~,
+here we do not have to assume that ~xs~ has a sum as length.
+
+Using heterogeneous equality in the proof that the sub-vectors
+catenate to the original one avoids a use of ~subst~.
+#+begin_src agda2
+record splitAt′ {n : ℕ} {ℓ : Level} {A : Set ℓ}
+                (xs : Vec A n) : Set ℓ where
+  field
+    {m₁} {m₂} : ℕ
+    n≡m₁+m₂ : m₁ + m₂ ≡ n
+    ys : Vec A m₁
+    zs : Vec A m₂
+    xs≅ys++zs : ys ++ zs ≅ xs
+#+end_src

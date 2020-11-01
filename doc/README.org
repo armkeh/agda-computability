@@ -1,0 +1,8 @@
+#+Title: Literate, documented source code
+#+Author: Mark Armstrong
+#+Description: 
+
+This directory contains literate, documented Agda source files.
+
+These files are “tangled” into raw source code files in [[file:./../src/][the ~src~ folder]].
+

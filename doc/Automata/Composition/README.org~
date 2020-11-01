@@ -1,0 +1,11 @@
+#+Title: Compositions of (general) automata
+#+Author: Mark Armstrong
+#+Description: 
+
+* Introduction
+
+Various representations of automata in Agda.
+
+Topmost files contain “general” notions of automata;
+specific notions such as the “classic” /finite automata/
+are contained in subdirectories.

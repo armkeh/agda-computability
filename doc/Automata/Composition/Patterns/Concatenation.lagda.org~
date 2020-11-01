@@ -1,0 +1,24 @@
+#+Title: Constructor patterns for the composition of automata
+#+Author: Mark Armstrong
+#+Description: As the title says.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../../src/Automata/Composition/Patterns/Concatenation.agda
+
+Our composition of NDA's includes, as states,
+- the states of the first machine,
+- the states of the second machine, and
+- one additional state, called the “~intermediate~” state.
+
+This is naturally captured using the ~Maybe~ of a disjoint union.
+But the constructor names ~just~, ~nothing~, ~inj₁~ and ~inj₂~ are
+uninformative.
+
+Thankfully, we can use ~pattern~'s to introduce alternate constructors
+for these states.
+#+begin_src agda2
+module Automata.Composition.Patterns.Concatenation where
+
+pattern _∶M q = just (inj₁ q)
+pattern _∶N q = just (inj₂ q)
+pattern intermediate = nothing
+#+end_src

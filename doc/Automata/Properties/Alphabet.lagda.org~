@@ -1,0 +1,83 @@
+#+Title: Properties of Automata regarding their alphabets
+#+Author: Mark Armstrong
+#+Description: 
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Properties/Alphabet.agda
+
+* Introduction                                  :noexport:
+* Agda header                                   :noexport:
+
+#+begin_src agda2
+module Automata.Properties.Alphabet where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Data.Empty using (⊥)
+open import Data.Product using (_,_)
+open import Data.Vec using ([])
+
+open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality using (_≡_ ; refl)
+
+open import Function.Bundles
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Utilities.ExistsSyntax
+
+open import Automata.Nondeterministic
+
+open import Automata.Composition.Patterns.Concatenation
+----------------------------------------------------------------------
+#+end_src
+
+* Empty alphabet
+
+#+begin_src agda2
+module Empty where
+#+end_src
+
+Automata which operate on the empty alphabet have no transitions.
+#+begin_src agda2
+  Δ-empty : {M : NDA ⊥}
+          → let Q = NDA.Q M
+                Δ = NDA.Δ M
+            in
+            {q : Q} {x : ⊥} {q′ : Q}
+          → ¬ (Δ q x q′)
+  Δ-empty {x = ()}
+#+end_src
+
+So any reachability relation involves the same state twice.
+#+begin_src agda2
+  Reachable→≡ : {M : NDA ⊥}
+              → let Q = NDA.Q M
+                    Reachable = NDA.Reachable M
+                in
+                {q q′ : Q}
+              → Reachable q q′
+              → q ≡ q′
+  Reachable→≡ (.0 , [] , q≡q′) = q≡q′
+#+end_src
+
+* With Injections
+
+:TODO: review title
+
+Given two alphabets ~Ϲ~ and ~Σ~,
+if we have a bijection ~f : Ϲ ⤖ Σ~,
+any results about NDA's on either alphabet also hold
+for NDA's on the other alphabet.
+
+This can be useful when composing alphabets in various ways. 
+
+#+begin_src agda2
+-- Ϲ is “lunate Sigma”.
+module WithInjection (Ϲ Σ : Set) (f : Ϲ ⤖ Σ) where
+
+  preserves : (P : (Σ₀ : Set) → {M : NDA Σ₀} → Set)
+            → ({M : NDA Ϲ} → P Ϲ {M})
+            → ({M : NDA Σ} → P Σ {M})
+  preserves P pf {M} = {!!}
+#+end_src

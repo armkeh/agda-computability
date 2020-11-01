@@ -1,0 +1,28 @@
+#+Title: Exists syntax
+#+Author: Mark Armstrong
+#+Description: ~Z~-like syntax for existential quantification.
+#+Startup: noindent
+
+I prefer a ~Z~-like syntax for existential quantification;
+that is, written as ~∃ a ∶ A • P a~ rather than
+the standard library's ~Σ[ a ∈ A ] P a~ syntax.
+The definition here is done in the same way as one for the
+standard library's syntax.
+
+#+Name: Exists-Implementation
+#+begin_src agda2 :tangle ../../src/Utilities/ExistsSyntax.agda
+module Utilities.ExistsSyntax where
+
+open import Level using (Level ; _⊔_)
+open import Data.Product using (Σ)
+
+variable
+  a b : Level
+  A : Set a
+  B : Set b
+
+∃-syntax : (A : Set a) → (A → Set b) → Set (a ⊔ b)
+∃-syntax = Σ
+
+syntax ∃-syntax A (λ x → B) = ∃ x ∶ A • B
+#+end_src

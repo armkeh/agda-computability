@@ -1,0 +1,53 @@
+#+Title: Simple properties of automata
+#+Author: Mark Armstrong
+#+Description: Properties which do not merit their own separate files.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composition/Concatenation.agda
+
+* Agda header                                   :noexport:
+
+#+begin_src agda2
+module Automata.Properties (Σ : Set) where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Data.Nat using (ℕ)
+open import Data.Product using (_,_)
+open import Data.Vec using (Vec ; [] ; _∷_ ; _++_)
+
+open import Relation.Binary.PropositionalEquality using (refl)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Automata.Nondeterministic
+----------------------------------------------------------------------
+#+end_src
+
+* Simple string properties
+
+** Catenating the empty string has no effect
+
+:TODO: Probably these are not correctly called “identity” laws, but it will do for now.
+
+#+begin_src agda2
+Δ*-identityʳ : {M : NDA Σ}
+             → let Q = NDA.Q M
+                   Δ* = NDA.Δ* M
+               in
+               {q : Q} → {n : ℕ} → {xs : Vec Σ n} → {q′ : Q}
+             → Δ* q xs q′
+             → Δ* q (xs ++ []) q′
+Δ*-identityʳ {_} {q} {_} {[]} {.q} refl = refl
+Δ*-identityʳ {_} {q} {_} {x ∷ xs} {q′} (q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  q₀ , Δ-q-x-q₀ , Δ*-identityʳ Δ*-q₀-xs-q′
+#+end_src
+
+#+begin_src agda2
+Accepts-identityʳ : {M : NDA Σ} → {n : ℕ} → (xs : Vec Σ n)
+                  → NDA.Accepts M xs
+                  → NDA.Accepts M (xs ++ [])
+Accepts-identityʳ [] M-accepts-xs  = M-accepts-xs
+Accepts-identityʳ xs@(_ ∷ _) (q , S-q , q′ , F-q′ , Δ*-q-xs-q′) =
+  q , S-q , q′ , F-q′ , Δ*-identityʳ Δ*-q-xs-q′
+#+end_src

@@ -1,0 +1,797 @@
+#+Title: “Concatenations” of nondeterministic automata
+#+Author: Mark Armstrong
+#+Description: Composing NDA's into a machine which accepts
+#+Description: the concatenation of their accepted languages.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composition/Concatenation.agda
+
+* Introduction
+
+We can “concatenate” two NDA's, say ~M~ and ~N~; 
+the resulting NDA, ~M ∪ N~ should accept the union of the languages
+accepted by ~M~ and ~N~.
+
+* Agda header                                   :noexport:
+
+Notice the module parameter Σ here.
+#+begin_src agda2
+module Automata.Composition.Concatenation (Σ : Set) where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Data.Empty using (⊥ ; ⊥-elim)
+open import Data.Nat using (ℕ ; suc)
+open import Data.Nat.Properties using (+-identityʳ)
+open import Data.Sum using (_⊎_)
+open import Data.Product using (_×_ ; _,_)
+open import Data.Maybe using (Maybe)
+open import Data.Vec using (Vec ; [] ; _∷_ ; splitAt)
+  renaming (_++_ to _++ⱽ_)
+--open import Data.Vec.Properties --using (++-identityʳ)
+
+open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_ ; refl)
+open import Relation.Binary.HeterogeneousEquality using (refl)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Utilities.ExistsSyntax
+open import Utilities.VecSplit
+
+open import Automata.Nondeterministic
+open import Automata.Properties Σ
+
+open import Automata.Composition.Patterns.Concatenation
+----------------------------------------------------------------------
+#+end_src
+
+* Concatenations of canonical nondeterministic automata
+
+Herein we provide an informal description of the concatenation,
+followed by a formal description and definition.
+
+** Informal description and impact of canonical representation features
+
+As a reminder, our canonical representation of
+nondeterministic automata
+- may have multiple start and final states, but
+- do not have ε-transitions.
+
+If our representation included ε-transitions,
+the definition of the concatenation would be simple;
+we would attach the final states of the first machine
+with the start states of the second machine
+using ε-transitions.
+
+As it stands, our definition is similar, though more complex.
+We introduce an “~intermediate~” state which “mimics”
+all of the final states of the first machine
+and the start states of the second machine.
+By “mimic”, we mean
+- all transitions /into/ the final states of the first machine
+  are duplicated by transitions into the ~intermediate~ state, and
+- all transition of /out of/ the start states of the second machine
+  are duplicated by transitions out of the ~intermediate~ state.
+
+So, given automata
+- ~M~ with start states ~sᴹ₁~, …, ~sᴹᵢ~ and final states ~fᴹ₁~, …, ~fᴹⱼ~, and
+- ~N~ with start states ~sᴺ₁~, …, ~sᴺₖ~ and final states ~fᴺ₁~, …, ~fᴺₗ~,
+pictured
+[[file:images/concat-preM.png]]
+and here
+[[file:images/concat-preN.png]]
+the concatenation ~M ++ N~ of the two is
+[[file:images/concatenation.png]]
+(We use dotted states and transitions to indicate /sets of/ states
+and transitions, and the labels ~Cᵢ~ to stand in for
+the /sets of/ elements of ~Σ~ labelling those transitions).
+:IMAGESRC:
+#+begin_src ditaa :exports none :file images/concat-preM.png
++---------------------------------------+
+| M                                     |
+|                                       |
+|    +-----+         +-----+    /-----\ |
+|    | {o} |         : {o} | C₁ |     | |
+| -->+ sᴹ₁ |    …    |     +=-->+ fᴹ₁ | |
+|    |     |         |     |    |     | |
+|    +-----+         +-----+    \-----/ |
+|                                       |
+|       ⋮       …                  ⋮    |
+|                                       |
+|    +-----+         +-----+    /-----\ |
+|    | {o} |         : {o} | C₂ |     | |
+| -->+ sᴹᵢ |    …    |     +=-->+ fᴹⱼ | |
+|    |     |         |     |    |     | |
+|    +-----+         +-----+    \-----/ |
+|                                       |
++---------------------------------------+
+#+end_src
+
+#+RESULTS:
+[[file:images/concat-preM.png]]
+
+#+begin_src ditaa :exports none :file images/concat-preN.png
++---------------------------------------+
+| N                                     |
+|                                       |
+|    +-----+    +-----+         /-----\ |
+|    | {o} | C₃ : {o} |         |     | |
+| -->+ sᴺ₁ +=-->+     |    …    | fᴺ₁ | |
+|    |     |    |     |         |     | |
+|    +-----+    +-----+         \-----/ |
+|                                       |
+|       ⋮          ⋮       …       ⋮    |
+|                                       |
+|    +-----+    +-----+         /-----\ |
+|    | {o} | C₄ : {o} |         |     | |
+| -->+ sᴺₖ +=-->+     |    …    | fᴺₗ | |
+|    |     |    |     |         |     | |
+|    +-----+    +-----+         \-----/ |
+|                                       |
++---------------------------------------+
+#+end_src
+
+#+RESULTS:
+[[file:images/concat-preN.png]]
+
+#+begin_src ditaa :exports none :file images/concatenation.png
++----------------------------------------------------------------------------------------------------------------------+
+| M ++ N                                                                                                               |
+|                                                                                                                      |
+| +-----------------------------------------+                             +-----------------------------------------+  |
+| : M                                       |                             : N                                       |  |
+| |    +-----+           +-----+    +-----+ |                             |    +-----+    +-----+           /-----\ |  |
+| |    | {o} |           : {o} | C₁ | {o} | |                             |    | {o} | C₃ : {o} |           |     | |  |
+| | -->+ sᴹ₁ |     …     |     +=-->+ fᴹ₁ | |                             |    | sᴺ₁ +--->|     |     …     | fᴺ₁ | |  |
+| |    |     |           |     |    |     | |                             |    |     |    |     |           |     | |  |
+| |    +-----+           +--+--+    +-----+ |      +--------------+       |    +-----+    +-----+           \-----/ |  |
+| |                         |               |      | {o}          |       |                  ^                      |  |
+| |                         |    C₁         |      |              |  C₃   |                  |                      |  |              
+| |                         \=--------------|=---->+              +=------|=-----------------/                      |  |
+| |                                         |      |              |       |                                         |  |
+| |                                         |      |              |       |                                         |  |
+| |       ⋮                 ⋮          ⋮    |      | intermediate |       |       ⋮          ⋮                 ⋮    |  |
+| |                                         |      |              |       |                                         |  |
+| |                                         |      |              |       |                                         |  |
+| |                         /=--------------|=---->+              +=------|=-----------------\                      |  |
+| |                         |    C₂         |      |              |  C₄   |                  |                      |  |
+| |                         |               |      |              |       |                  v                      |  |
+| |    +-----+           +--+--+    +-----+ |      +--------------+       |    +-----+    +--+--+           /-----\ |  |
+| |    | {o} |           : {o} | C₂ | {o} | |                             |    | {o} | C₄ : {o} |           |     | |  |
+| | -->+ sᴹᵢ |     …     |     +=-->+ fᴹⱼ | |                             |    | sᴺₖ +--->|     |     …     | fᴺₗ | |  |
+| |    |     |           |     |    |     | |                             |    |     |    |     |           |     | |  |
+| |    +-----+           +-----+    +-----+ |                             |    +-----+    +-----+           \-----/ |  |
+| |                                         |                             |                                         |  |
+| +-----------------------------------------+                             +-----------------------------------------+  |
+|                                                                                                                      |
++----------------------------------------------------------------------------------------------------------------------+
+#+end_src
+
+#+RESULTS:
+[[file:images/concatenation.png]]
+
+:END:
+
+There are some subtleties regarding start and final states
+we must consider, which are not captured
+by the above diagram;
+- if any final state of the first machine is also a start state,
+  then the ~intermediate~ state must also be a start state, and
+- if any start state of the second machine is also a final state,
+  then the ~intermediate~ state must also be a final state.
+
+** The concatenation
+
+Given NDA's ~M~ and ~N~, we will define an NDA ~M ++ N~ such that:
+- The set of states of the concatenation is the disjoint union of
+  the sets of states of ~M~ and ~N~, plus a state called ~intermediate~.
+- The set of start states of the concatenation is
+  the set of start states of ~M~.
+  - If any start states of ~M~ are also final states,
+    then ~intermediate~ is also a start state.
+- The set of final states of the concatenation is
+  the set of final states of ~N~.
+  - If any final states of ~M~ are also start states,
+    then ~intermediate~ is also a start state.
+- The transition function contains the transitions from ~M~ and from ~N~,
+  as well as a “duplicate” transitions as follows:
+  - For any state ~q~ of ~M~, character ~c~, and /final state/ ~f~ of ~M~,
+    if ~Δ q c f~, then we add a transition from ~q~ to ~intermediate~
+    labelled with ~c~.
+  - For any state ~q~ of ~N~, character ~c~, and /start state/ ~s~ of ~N~,
+    if ~Δ s c q~, then we add a transition from ~intermediate~ to ~q~
+    labelled with ~c~.
+#+begin_src agda2
+_++_ : (M N : NDA Σ) → NDA Σ
+⟨ Q₁ , S₁ , F₁ , Δ₁ ⟩ ++ ⟨ Q₂ , S₂ , F₂ , Δ₂ ⟩ = ⟨ Q , S , F , Δ ⟩
+  where
+    Q : Set
+    Q = Maybe (Q₁ ⊎ Q₂)
+
+    S : Q → Set
+    S (q ∶M) = S₁ q
+    S (_ ∶N) = ⊥
+    S intermediate = ∃ q ∶ Q₁ • (S₁ q × F₁ q)
+
+    F : Q → Set
+    F (_ ∶M) = ⊥
+    F (q ∶N) = F₂ q
+    F intermediate = ∃ q ∶ Q₂ • (S₂ q × F₂ q)
+
+    Δ : Q → Σ → Q → Set
+    Δ (q ∶M) c (q′ ∶M) = Δ₁ q c q′
+    Δ (q ∶N) c (q′ ∶N) = Δ₂ q c q′
+    Δ (q ∶M) c intermediate = ∃ f ∶ Q₁ • (F₁ f × Δ₁ q c f)
+    Δ intermediate c (q′ ∶N) = ∃ s ∶ Q₂ • (S₂ s × Δ₂ s c q′)
+    {-# CATCHALL #-}
+    Δ _ _ _ = ⊥
+#+end_src
+
+* Proving that ~M ++ N~ is a concatenation
+  
+We wish to prove that ~M ++ N~ is in fact the “concatenation” of ~M~ and ~N~.
+To do so, we must prove, for all strings ~xs~,
+1. if ~xs~ can be written as ~ys ++ zs~ such that ~M~ accepts ~ys~
+   and ~N~ accepts ~zs~, then ~M ++ N~ accepts ~xs~,
+2. if ~M ++ N~ accepts ~xs~, then ~xs~ can be written as ~ys ++ zs~
+   such that ~M~ accepts ~ys~ and ~N~ accepts ~zs~.
+These facts are proven in [[Acceptance in ~M ++ N~]] below.
+
+As stated in [[file:./README.org::Reasoning about compositions][the README]],
+we must first begin with reasoning about transition chains in ~M ++ N~.
+Specifically, to prove facts (1) and (2) above, we must show
+:TODO:
+
+** Transition chains
+
+*** “Paths in ~M~ or in ~N~ also exist in ~M ++ N~”
+
+For any path in ~M~, there is an identical path in ~M ++ N~.
+#+begin_src agda2
+M-path : {M N : NDA Σ}
+       → let Q₁ = NDA.Q M
+             Δ₁* = NDA.Δ* M
+             Δ* = NDA.Δ* (M ++ N)
+         in
+         (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+       → Δ₁* q xs q′
+       → Δ* (q ∶M) xs (q′ ∶M)
+M-path q [] .q refl = refl
+M-path q (x ∷ xs) q′
+  (q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+    (q₀ ∶M) , Δ-q-x-q₀ , M-path q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+The same holds true for paths in ~N~.
+#+begin_src agda2
+N-path : {M N : NDA Σ}
+       → let Q₂ = NDA.Q N
+             Δ₂* = NDA.Δ* N
+             Δ* = NDA.Δ* (M ++ N)
+         in
+         (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+       → Δ₂* q xs q′
+       → Δ* (q ∶N) xs (q′ ∶N)
+N-path q [] .q refl = refl
+N-path q (x ∷ xs) q′
+  (q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+    (q₀ ∶N) , Δ-q-x-q₀ , N-path q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+*** “Paths ending at final states of ~M~ also end at ~intermediate~”
+
+For any (positive length) path in ~M~ ending at a final state,
+there is a corresponding path in ~M ++ N~ which ends at ~intermediate~.
+#+begin_src agda2
+intermediate-from-M : {M N : NDA Σ}
+                    → let Q₁ = NDA.Q M
+                          F₁ = NDA.F M
+                          Δ₁* = NDA.Δ* M
+                          Δ* = NDA.Δ* (M ++ N)
+                      in
+                      (q : Q₁) → {n : ℕ} → (xs : Vec Σ (suc n)) → (q′ : Q₁) → F₁ q′
+                    → Δ₁* q xs q′
+                    → Δ* (q ∶M) xs intermediate
+intermediate-from-M q (x ∷ []) q′ F-q′ (.q′ , Δ-q-x-q′ , refl) =
+  intermediate , (q′ , F-q′ , Δ-q-x-q′) , refl
+intermediate-from-M q (x ∷ xs@(_ ∷ _)) q′ F-q′ (q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  q₀ ∶M , Δ-q-x-q₀ , intermediate-from-M q₀ xs q′ F-q′ Δ*-q₀-xs-q′
+#+end_src
+
+*** “Paths beginning from start states of ~N~ also begin at ~intermediate~”
+
+For any (positive length) path in ~N~ beginning from a start state,
+there is a corresponding path in ~M ++ N~ which begins from ~intermediate~.
+#+begin_src agda2
+intermediate-to-N : {M N : NDA Σ}
+                  → let Q₂ = NDA.Q N
+                        S₂ = NDA.S N
+                        Δ₂* = NDA.Δ* N
+                        Δ* = NDA.Δ* (M ++ N)
+                    in
+                    (q : Q₂) → S₂ q → {n : ℕ} → (xs : Vec Σ (suc n)) → (q′ : Q₂)
+                  → Δ₂* q xs q′
+                  → Δ* intermediate xs (q′ ∶N)
+intermediate-to-N q S-q (x ∷ []) q′
+  (.q′ , Δ-q-x-q′ , refl) =
+    q′ ∶N , (q , S-q , Δ-q-x-q′) , refl
+intermediate-to-N q S-q (x ∷ xs@(_ ∷ _)) q′
+  (q₀ , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+    q₀ ∶N , (q , S-q , Δ-q-x-q₀) , N-path q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+*** “Paths which meet in the middle are connected”
+
+#+begin_src agda2
+meet-in-the-middle : {M N : NDA Σ}
+                   → let Q₁ = NDA.Q M
+                         F₁ = NDA.F M
+                         Δ₁* = NDA.Δ* M
+                         Q₂ = NDA.Q N
+                         S₂ = NDA.S N
+                         Δ₂* = NDA.Δ* N
+                         Δ* = NDA.Δ* (M ++ N)
+                     in
+                     (q : Q₁) → {n₁ : ℕ} → (ys : Vec Σ (suc n₁)) → (q′ : Q₁) → F₁ q′
+                   → (r : Q₂) → S₂ r → {n₂ : ℕ} → (zs : Vec Σ (suc n₂)) → (r′ : Q₂)
+                   → Δ₁* q ys q′
+                   → Δ₂* r zs r′
+                   → Δ* (q ∶M) (ys ++ⱽ zs) (r′ ∶N)
+meet-in-the-middle q (y ∷ []) q′ F-q′ r S-r (z ∷ zs) r′ (.q′ , Δ-q-y-q′ , refl) (r₀ , Δ-r-z-r₀ , Δ*-r₀-zs-r′) =
+  intermediate , (q′ , F-q′ , Δ-q-y-q′) , r₀ ∶N , (r , S-r , Δ-r-z-r₀) , N-path r₀ zs r′ Δ*-r₀-zs-r′
+meet-in-the-middle q (y ∷ ys@(_ ∷ _)) q′ F-q′ r S-r zs@(_ ∷ _) r′ (q₀ , Δ-q-y-q₀ , Δ*-q₀-ys-q′) Δ*-r-zs-r′ =
+  q₀ ∶M , Δ-q-y-q₀ , meet-in-the-middle q₀ ys q′ F-q′ r S-r zs r′ Δ*-q₀-ys-q′ Δ*-r-zs-r′
+#+end_src
+
+*** “Paths which connect states in ~N~ are contained in ~N~”
+
+#+begin_src agda2
+path-in-N : {M N : NDA Σ}
+          → let Q₂ = NDA.Q N
+                Δ₂* = NDA.Δ* N
+                Δ* = NDA.Δ* (M ++ N)
+            in
+            (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+          → Δ* (q ∶N) xs (q′ ∶N)
+          → Δ₂* q xs q′
+path-in-N q [] .q refl = refl
+path-in-N q (x ∷ xs) q′ (q₀ ∶N , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+  q₀ , Δ-q-x-q₀ , path-in-N q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+*** “Paths which connect the two machines have a middle” 
+
+#+begin_src agda2
+find-the-middle : {M N : NDA Σ}
+                → let Q₁ = NDA.Q M
+                      Q₂ = NDA.Q N
+                      Q = NDA.Q (M ++ N)
+                      F₁ = NDA.F M
+                      Δ₁* = NDA.Δ* M
+                      Δ₂* = NDA.Δ* N
+                      Δ* = NDA.Δ* (M ++ N) in
+                  (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+                → Δ* (q ∶M) xs (q′ ∶N)
+                → ∃ m ∶ ℕ •
+                    let (ys , zs , ys++zs≡xs) = splitAt m {!!} in
+                  ∃ f ∶ Q₁ •
+                  ∃ s ∶ Q₂ •
+                     (Δ₁* q ys f 
+                    × Δ₂* s zs q′)
+find-the-middle = {!!}
+#+end_src
+
+*** “There are no paths from ~N~ to ~intermediate~”
+
+The base case is immediately dismissed by Agda.
+#+begin_src agda2
+¬back-to-intermediate : {M N : NDA Σ}
+                      → let Q₂ = NDA.Q N
+                            Δ* = NDA.Δ* (M ++ N)
+                        in
+                        (q : Q₂) → {n : ℕ} → (xs : Vec Σ n)
+                      → ¬ (Δ* (q ∶N) xs intermediate)
+¬back-to-intermediate q (x ∷ xs) (q₀ ∶N , Δ-q-x-q₀ , Δ*-q₀-xs-intermediate) =
+  ¬back-to-intermediate q₀ xs Δ*-q₀-xs-intermediate
+#+end_src
+
+** Acceptance in ~M ++ N~
+
+*** “Accepts all”
+
+#+begin_src agda2
+AcceptsAll : {M N : NDA Σ}
+           → {n₁ : ℕ} → (ys : Vec Σ n₁)
+           → {n₂ : ℕ} → (zs : Vec Σ n₂)
+           → NDA.Accepts M ys
+           → NDA.Accepts N zs
+           → NDA.Accepts (M ++ N) (ys ++ⱽ zs)
+#+end_src
+
+The proof proceeds by nested induction;
+first on the string ~ys~, then on ~zs~.
+
+If both ~ys~ and ~zs~ are empty, there are states in
+both ~M~ and ~N~ which are both start and final states.
+So ~intermediate~ is also both start and final,
+so ~M ++ N~ accepts the empty string.
+#+begin_src agda2 :exports none
+-- Induction on ys base case 1 – induction on zs base case
+#+end_src
+#+begin_src agda2
+AcceptsAll [] []
+           (q  , S-q  , .q , F-q  , refl)
+           (q′ , S-q′ , .q′ , F-q′ , refl) =
+               intermediate
+             , (q , S-q , F-q)
+             , intermediate
+             , (q′ , S-q′ , F-q′)
+             , refl
+#+end_src
+
+Now, when only the first string is empty,
+since ~M~ accepts the empty string, there is a start state of ~M~ which
+is also final, and so ~intermediate~ will be a start state.
+We then substitute ~intermediate~ into the proof
+that ~N~ accepts ~zs~ to prove ~M ++ N~ accepts ~zs~.
+#+begin_src agda2 :exports none
+-- Induction on ys base case 2 – induction on zs base case
+#+end_src
+#+begin_src agda2
+AcceptsAll [] zs@(_ ∷ _)
+           (q  , S-q  , .q , F-q  , refl)
+           (q₀ , S-q₀ , q′ , F-q′ , Δ*-q₀-zs-q′) =
+             intermediate , (q , S-q , F-q) , q′ ∶N , F-q′
+           , intermediate-to-N q₀ S-q₀ zs q′ Δ*-q₀-zs-q′
+#+end_src
+
+In the first induction step, when only the second string is empty,
+since ~N~ accepts the empty string, there is a final state of ~N~ which
+is also a start state, and so ~intermediate~ will be a final state.
+We substitute ~intermediate~ into the proof that ~M~ accepts ~ys~
+to prove that ~M ++ N~ accepts ~ys~.
+(In fact, we must prove it accepts ~ys ++ []~, and we need
+a helper function, ~Δ*-identityʳ~, for that.)
+#+begin_src agda2
+-- Induction on ys induction step 1 – induction on zs base case
+#+end_src
+#+begin_src agda2 :exports none
+AcceptsAll {n₁ = n₁} ys@(_ ∷ _) []
+           (q  , S-q  , q₀   , F-q₀ , Δ*-q-ys-q₀)
+           (q′ , S-q′ , .q′ , F-q′ , refl) =
+             q ∶M , S-q , intermediate , (q′ , S-q′ , F-q′)
+           , intermediate-from-M q (ys ++ⱽ []) q₀ F-q₀ (Δ*-identityʳ Δ*-q-ys-q₀)
+#+end_src
+
+Finally, we have the case that both strings are nonempty.
+#+begin_src agda2
+-- Induction on ys induction step 1 – induction on zs base case
+#+end_src
+#+begin_src agda2 :exports none
+AcceptsAll ys@(_ ∷ _) zs@(_ ∷ _)
+           (q , S-q , q′ , F-q′ , Δ*-q-ys-q′)
+           (r , S-r , r′ , F-r′ , Δ*-r-zs-r′) =
+             q ∶M , S-q , r′ ∶N , F-r′ ,
+             meet-in-the-middle q ys q′ F-q′ r S-r zs r′ Δ*-q-ys-q′ Δ*-r-zs-r′
+#+end_src
+
+*** “Accepts only”
+
+#+begin_src agda2
+AcceptsOnly : {M N : NDA Σ}
+            → let Q₁ = NDA.Q M
+                  Q₂ = NDA.Q N
+                  Q = NDA.Q (M ++ N)
+                  F₁ = NDA.F M
+                  Δ₁* = NDA.Δ* M
+                  Δ₂* = NDA.Δ* N
+                  Δ* = NDA.Δ* (M ++ N) in
+              {n : ℕ} → (xs : Vec Σ n)
+            → NDA.Accepts (M ++ N) xs
+            → ∃ split ∶ Split xs •
+                let ys = Split.ys split
+                    zs = Split.zs split
+                in
+              (NDA.Accepts M ys × NDA.Accepts N zs)
+#+end_src
+
+In the base case, when the string is empty, the proof
+that ~M ++ N~ accepts ~[]~ /must/ use the ~intermediate~ state
+as both the beginning and ending state;
+all other possibilities can be shown to be impossible,
+because no state which is part of ~M~ or ~N~ can be both
+a start and a final state.
+#+begin_src agda2 :tangle no :exports no
+-- Impossible base cases: neither M nor N contain both a start and final state.
+#+end_src
+#+begin_src agda2
+AcceptsOnly [] (q ∶M , _  , .q ∶M , () , refl)
+AcceptsOnly [] (q ∶N , () , .q ∶N , _  , refl)
+#+end_src
+
+Now, the fact that in this base case ~intermediate~ is both
+a start state and a final state gives us enough
+to prove that both ~M~ and ~N~ accept the empty string,
+since it means there are states in both ~M~ and ~N~ which are
+both start and final states.
+#+begin_src agda2 :tangle no :exports no
+-- Base case: both the start and final state must be the intermediate state.
+#+end_src
+#+begin_src agda2
+AcceptsOnly []
+   (intermediate
+  , (q₁ , S-q₁ , F-q₁)
+  , intermediate
+  , (q₂ , S-q₂ , F-q₂)
+  , refl) =
+      record { n≡m₁+m₂ = refl ; ys = [] ; zs = [] ; xs≅ys++zs = refl }
+    , (q₁ , S-q₁ , q₁ , F-q₁ , refl)
+    , q₂ , S-q₂ , q₂ , F-q₂ , refl
+#+end_src
+
+The induction step involves several cases, based on the states used
+in the proof that ~M ++ N~ accepts ~x ∷ xs~. In turn, we consider the case
+1. that the starting state is ~intermediate~ and the final state is in ~N~,
+2. that the starting state is in ~M~ and the final state is ~intermediate~, and
+3. that the start state is in ~M~ and the final state is in ~M~.
+Cases (1) and (2) are relatively simple; in them, one machine accepts
+the whole of ~x ∷ xs~, while the other accepts the empty string.
+
+#+begin_src agda2
+AcceptsOnly (x ∷ xs)
+   (intermediate     --  If we started from intermediate…
+  , (q , S-q , F-q)  --… then there's a q : M which is start and final.
+  , q′ ∶N , F-q′
+  , (q₀ ∶N , (s , S-s , Δ-s-x-q₀) , Δ*-q₀-xs-q′)) =
+      record { n≡m₁+m₂ = refl ; ys = [] ; zs = x ∷ xs ; xs≅ys++zs = refl }
+    , (q , S-q , q , F-q , refl)
+    , (s , S-s , q′ , F-q′ , (q₀ , Δ-s-x-q₀ , path-in-N q₀ xs q′ Δ*-q₀-xs-q′))
+#+end_src
+
+#+begin_src agda2
+AcceptsOnly (x ∷ xs)
+   (q ∶M , S-q
+  , intermediate        -- If we are ending at intermediate…
+  , (q′ , S-q′ , F-q′)  --… then there's a q′ : N which is start and final.
+  , pf) =
+      record { n≡m₁+m₂ = +-identityʳ _ ; ys = x ∷ xs ; zs = [] ;
+               xs≅ys++zs = {!!} }
+    , {!!}
+#+end_src
+
+#+begin_src agda2
+AcceptsOnly (x ∷ xs) (q ∶M , S-q , q′ ∶N , F-q′ , pf) = {!!}
+#+end_src
+
+The case that intermediate is used both as the start and final state
+in the proof that ~M ++ N~ accepts ~x ∷ xs~ is impossible,
+because we must transition into ~N~ by ~x~, and
+we cannot return from ~N~ to ~intermediate~.
+#+begin_src agda2
+AcceptsOnly (x ∷ xs)
+   (intermediate
+  , _
+  , intermediate
+  , _
+  , (q₀ ∶N) , _ , Δ*-q₀-xs-intermediate) =
+    ⊥-elim (¬back-to-intermediate q₀ xs Δ*-q₀-xs-intermediate)
+#+end_src
+* COMMENT Old stuff
+
+** Construction
+
+These transition functions are for an older version of composition;
+in that version, all states from both machines were included,
+and there was no intermediate state;
+connections were made between the final states of the first machine
+and any state connected to by a start state of the second.
+With this machine it is easier to prove that transition chains from either
+machine appear in the concatenation, but harder to prove that
+transition chains from the concatenation are composed from transition
+chains in the submachines.
+
+Specifically, the difficulty is in even expressing the property;
+the below existential quantification must be repeated.
+While our chosen representation also involves existential quantifications,
+in this case in the state sets, they seem more “justified”.
+The below makes an arbitrary choice about what the “intermediate”
+state should be.
+#+begin_example agda2
+        Δ (inj₁ q) c (inj₁ q′) = Δ₁ q c q′
+        Δ (inj₂ q) c (inj₂ q′) = Δ₂ q c q′
+        Δ (inj₁ q) c (inj₂ q′) = F₁ q × (∃ s ∶ Q₂ • Δ₂ s c q′)
+        Δ (inj₂ _) _ (inj₁ _) = ⊥
+#+end_example
+
+** Proofs
+
+I need to check if there is unique work here;
+these proofs were done without enough focus on the final goal,
+so some properties may bave been unnecessary to prove, but still
+interesting and worth keeping.
+
+*** The proofs
+
+As with the union of two NDAs, any transition chain in an NDA is also
+in the concatenation of that NDA with another. 
+These proofs are identical to those for unions.
+#+begin_src agda2
+    M-Δ*⇒M++N-Δ* : {M N : NDA |Σ|}
+                  → let Q₁ = NDA.Q M
+                        F₁ = NDA.F M
+                        Δ₁* = NDA.Δ* M
+                        Δ* = NDA.Δ* (M ++ N) in
+                    (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+                  → Δ₁* q xs q′
+                  → Δ* (q ∶M) xs (q′ ∶M)
+    M-Δ*⇒M++N-Δ* q [] .q refl = refl
+    M-Δ*⇒M++N-Δ* q (x ∷ xs) q′ (q₀ , Δ₁-q-x-q₀ , Δ₁*-q₀-xs-q′) =
+      q₀ ∶M , Δ₁-q-x-q₀ , M-Δ*⇒M++N-Δ* q₀ xs q′ Δ₁*-q₀-xs-q′
+
+    N-Δ*⇒M++N-Δ* : {M N : NDA |Σ|}
+                  → let Q₂ = NDA.Q N
+                        Δ₂* = NDA.Δ* N
+                        Δ* = NDA.Δ* (M ++ N) in
+                    (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+                  → Δ₂* q xs q′
+                  → Δ* (q ∶N) xs (q′ ∶N)
+    N-Δ*⇒M++N-Δ* q [] .q refl = refl
+    N-Δ*⇒M++N-Δ* q (x ∷ xs) q′ (q₀ , Δ₂-q-x-q₀ , Δ₂*-q₀-xs-q′) =
+      q₀ ∶N , Δ₂-q-x-q₀ , N-Δ*⇒M++N-Δ* q₀ xs q′ Δ₂*-q₀-xs-q′
+#+end_src
+
+If there is a transition chain in ~M~ which ends with a final state,
+and a transition chain in ~N~ which begins with a start state,
+then the concatenation of those transition chains exists in ~M ++ N~.
+Here we must insist that the transition chains have length
+greater than zero; otherwise, ~q~ and ~q′~ will not really
+be connected (but 
+#+begin_src agda2
+    M-Δ*∧N-Δ*⇒M++N-Δ* : {M N : NDA |Σ|}
+                       → let Q₁ = NDA.Q M
+                             F₁ = NDA.F M
+                             Q₂ = NDA.Q N
+                             S₂ = NDA.S N
+                             Δ₁* = NDA.Δ* M
+                             Δ₂* = NDA.Δ* N
+                             Δ* = NDA.Δ* (M ++ N) in
+                         (q : Q₁) → {n₁ : ℕ} → (xs : Vec Σ (suc n₁)) → (f : Q₁)
+                       → F₁ f
+                       → Δ₁* q xs f
+                       → (s : Q₂) → {n₂ : ℕ} → (ys : Vec Σ (suc n₂)) → (q′ : Q₂)
+                       → S₂ s
+                       → Δ₂* s ys q′
+                       → Δ* (q ∶M) (xs ++ⱽ ys) (q′ ∶N)
+    M-Δ*∧N-Δ*⇒M++N-Δ* q (x ∷ xs) f F-f re₁ s ys q′ S-s re₂ = {!!}
+#+end_src
+
+It's impossible to go from the second machine back to the first.
+#+begin_src agda2
+    ¬M++N-Δ*-q∶N-q′∶M : {M N : NDA |Σ|}
+                      → let Q₁ = NDA.Q M
+                            Q₂ = NDA.Q N
+                            Δ* = NDA.Δ* (M ++ N)
+                        in
+                        (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+                      → ¬ (Δ* (q ∶N) xs (q′ ∶M))
+    ¬M++N-Δ*-q∶N-q′∶M q (_ ∷ xs) q′ ((q₀ ∶N) , _ , Δ*-q₀-xs-q′) =
+      ¬M++N-Δ*-q∶N-q′∶M q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+It's also impossible to go from the intermediate state back to the
+first machine, because after the intermediate state
+we can only reach a state from the second machine.
+#+begin_src agda2
+    ¬M++N-Δ*-int-q′∶M : {M N : NDA |Σ|}
+                      → let Q₁ = NDA.Q M
+                            Δ* = NDA.Δ* (M ++ N)
+                        in
+                        {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+                      → ¬ (Δ* intermediate xs (q′ ∶M))
+    ¬M++N-Δ*-int-q′∶M (_ ∷ xs) q′ ((q₀ ∶N) , _ , Δ*-q₀-xs-q′) =
+      ¬M++N-Δ*-q∶N-q′∶M q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+If the beginning and end of a transition chain in a composition
+belong to the same machine, then the whole transition chain exists
+in that machine.
+#+begin_src agda2
+    M++N-Δ*⇒M-Δ* : {M N : NDA |Σ|}
+                  → let Q₁ = NDA.Q M
+                        Q = NDA.Q (M ++ N)
+                        Δ₁* = NDA.Δ* M
+                        Δ* = NDA.Δ* (M ++ N) in
+                    (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₁)
+                  → Δ* (q ∶M) xs (q′ ∶M)
+                  → Δ₁* q xs q′
+    M++N-Δ*⇒M-Δ* q [] .q refl = refl
+    M++N-Δ*⇒M-Δ* q (x ∷ xs) q′ (q₀ ∶M , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+      q₀ , Δ-q-x-q₀ , M++N-Δ*⇒M-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+    -- Impossible case; we can't transition to the intermediate state,
+    -- because then we'd end up in N.
+    M++N-Δ*⇒M-Δ* q (x ∷ xs) q′ (intermediate , _ , Δ*-q₀-xs-q′) =
+      ⊥-elim (¬M++N-Δ*-int-q′∶M xs q′ Δ*-q₀-xs-q′)
+
+    M++N-Δ*⇒N-Δ* : {M N : NDA |Σ|}
+                  → let Q₂ = NDA.Q N
+                        Q = NDA.Q (M ++ N)
+                        Δ₂* = NDA.Δ* N
+                        Δ* = NDA.Δ* (M ++ N) in
+                    (q : Q₂) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+                  → Δ* (q ∶N) xs (q′ ∶N)
+                  → Δ₂* q xs q′
+    M++N-Δ*⇒N-Δ* q [] .q refl = refl
+    M++N-Δ*⇒N-Δ* q (x ∷ xs) q′ (q₀ ∶N , Δ-q-x-q₀ , Δ*-q₀-xs-q′) =
+      q₀ , Δ-q-x-q₀ , M++N-Δ*⇒N-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+#+end_src
+
+If there is a transition chain in the concatenation of ~M~ and ~N~
+which begins in ~M~ and ends in ~N~, then it must be
+the concatenation of two strings, the first of which
+is accepted by ~M~ and the second of which must be accepted by ~N~.
+#+begin_src agda2
+    M++N-Δ*⇒M-Δ*∧N-Δ* : {M N : NDA |Σ|}
+                       → let Q₁ = NDA.Q M
+                             Q₂ = NDA.Q N
+                             Q = NDA.Q (M ++ N)
+                             F₁ = NDA.F M
+                             Δ₁* = NDA.Δ* M
+                             Δ₂* = NDA.Δ* N
+                             Δ* = NDA.Δ* (M ++ N) in
+                         (q : Q₁) → {n : ℕ} → (xs : Vec Σ n) → (q′ : Q₂)
+                       → Δ* (q ∶M) xs (q′ ∶N)
+                       → ∃ m₁ ∶ ℕ •
+                         ∃ m₂ ∶ ℕ •
+                         ∃ ys ∶ Vec Σ m₁ •
+                         ∃ zs ∶ Vec Σ m₂ •
+                         ∃ n≡m₁+m₂ ∶ n ≡ m₁ + m₂ •
+                         ∃ f ∶ Q₁ •
+                         ∃ s ∶ Q₂ •
+                            (xs ≅ ys ++ⱽ zs
+                           × Δ₁* q ys f 
+                           × Δ₂* s zs q′)
+    M++N-Δ*⇒M-Δ*∧N-Δ* q (x₁ ∷ x₂ ∷ xs) q′
+                       (intermediate , -- next state is intermediate
+                       (f , F₁-f , Δ₁-q-x₁-f) , -- so q is connected to a final state by x₁
+                       (q₀ ∶N) , -- state after the intermediate one
+                       (s , S₂-s , Δ₂-s-x₂-q₀) , -- which is connected to a start state by x₂
+                       Δ*-q₀-xs-q′) = 
+      _ , _
+      , x₁ ∷ [] -- intermediate is next state ⇒ M reaches final state in one step
+      , x₂ ∷ xs -- ↑ ⇒ remaining chain is in N
+      , refl  
+      , f       -- The final state of M replaced by intermediate 
+      , s       -- The start state of N replaced by intermediate
+      , refl
+      , (f , Δ₁-q-x₁-f , refl) -- f is reachable in one step
+      -- q₀ and q′ are in same machine, so are connected by xs
+      , (q₀ , Δ₂-s-x₂-q₀ , M++N-Δ*⇒N-Δ* q₀ xs q′ Δ*-q₀-xs-q′)
+    M++N-Δ*⇒M-Δ*∧N-Δ* q (x ∷ xs@(_ ∷ _)) q′ (q₀ ∶M , Δ-q-x₁-q₀ , Δ*-q₀-xs-q′)
+      with M++N-Δ*⇒M-Δ*∧N-Δ* q₀ xs q′ Δ*-q₀-xs-q′
+    … | zero , m₂ , [] , zs , refl , f , s , refl , M-Δ*-q₀-ys-f , N-Δ*-s-zs-q′ =
+        suc zero
+      , m₂
+      , x ∷ []
+      , zs
+      , refl
+      , f
+      , s
+      , refl
+      , (q₀ , Δ-q-x₁-q₀ , M-Δ*-q₀-ys-f)
+      , N-Δ*-s-zs-q′
+    … | m₁@(suc _) , m₂ , ys , zs , refl , f , s , xs≅ys++zs , M-Δ*-q₀-ys-f , N-Δ*-s-zs-q′ =
+        suc m₁
+      , m₂
+      , x ∷ ys
+      , zs
+      , refl
+      , f
+      , s
+      , ≅-cong (x ∷_) xs≅ys++zs
+      , (q₀ , Δ-q-x₁-q₀ , M-Δ*-q₀-ys-f)
+      , N-Δ*-s-zs-q′
+#+end_src
+A note on implementation here: we need to pattern match on
+the result of ~m₁~ from the recursive call in order
+to prove ~x ∷ xs ≅ ys ++ zs~.

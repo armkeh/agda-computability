@@ -1,0 +1,19 @@
+#+Title: Nondeterministic finite automata
+#+Author: Mark Armstrong
+#+Description: 
+
+* Introduction
+
+:TODO:
+
+* Agda header                                   :noexport:
+
+#+begin_src agda2
+module Automata.Finite.Nondeterministic
+#+end_src
+
+* Definition
+
+#+begin_src agda2
+
+#+end_src

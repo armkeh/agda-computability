@@ -1,0 +1,36 @@
+#+Title: Compositions of (general) automata
+#+Author: Mark Armstrong
+#+Description: 
+
+* Introduction
+
+Various methods of composing automata, to obtain machines which accept
+- the union,
+- the concatenation,
+- the intersection,
+- the product,
+- etc.
+of the languages accepted by their components.
+
+* Reasoning about compositions
+
+For this discussion, let ~⊕~ be any method of composing two automata,
+in the sense that ~M ⊕ N~ is the automata accepting ~L(M) ⊕ L(N)~.
+
+Given a definition of ~⊕~ in Agda, we must naturally justify the definition
+by showing that ~M ⊕ N~ accepts /all/ strings and /only/ strings from
+~L(M) ⊕ L(N)~.
+
+Specifically, by the definition of “acceptance”, the proof of
+“~M ⊕ N~ accepts all strings from ~L(M) ⊕ L(N)~”
+involves proving, for any string string ~xs : L(M) ⊕ L(N)~,
+there is a start state ~s~ and a final state ~f~ in ~M ⊕ N~ such that
+there is a transition chain from ~s~ to ~f~ labelled by
+the elements of ~xs~ (in order).
+The “only” direction involves similar proofs.
+
+Because of this relation between “acceptance” and transition chains,
+we must always begin by proving more general results about
+the existance (or non-existance) of transition chains
+in ~M ⊕ N~ based on the existance (or non-existance)
+of transition chains in ~M~ and ~N~.

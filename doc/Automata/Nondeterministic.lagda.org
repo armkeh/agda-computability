@@ -1,0 +1,186 @@
+#+Title: Nondeterministic automata; /NDA/'s.
+#+Author: Mark Armstrong
+#+Description: Nondeterministic automata, though not necessarily
+#+Description: with finitely many states.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../src/Automata/Nondeterministic.agda
+
+* Introduction
+
+** Motivations – “Why not finite automata?”
+
+Our goal here is to define a “generalised” notion of
+nondeterministic finite automata.
+
+Removing the requirement that the state set be finite
+makes several proofs easier. Notable difficulties include:
+- Composition of machines in various ways have state sets which
+  include the disjoint union of the state sets of the underlying machines;
+  reasoning about injections from the underlying state sets into the
+  the composed machine's state set is extremely tedious.
+- :TODO:
+
+** Design decision – “Features of nondeterministic automata”
+
+There are three significant design decisions to be made
+in the implementation of these nondeterministic machines.
+Specifically, we must choose whether to allow
+1) ε-transitions,
+2) multiple start states, and/or
+3) multiple final states.
+All three of these features obviously do not change
+the expressiveness of the machine;
+given a machine with these features, we can always obtain
+one without them which accepts the same language
+by simply adding transitions.
+:TODO: example of converting a machine
+
+We can and will represent machines with any mix of these features.
+However, it is useful to choose a canonical representation,
+to be used in (at least the majority of) reasoning about these machines.
+Semantic-preserving mappings between the different kinds of machines
+can then be given in order to apply what is known about the
+canonical representation to others.
+
+*** Evaluation of the features
+
+Many definitions of nondeterministic /finite/ automata begin
+with machines including feature (3) and not features (1) and (2).
+This seems to be primarily to make the definition better align
+to that of /deterministic/ finite automata,
+and so this does not motivate our design decisions.
+:TODO: reference sources
+
+The benefit of all of these features is /convenience/ when defining machines.
+That convenience cannot be our highest priority during mechanisation,
+though it does deserve some consideration as we must define machines
+to prove several properties (such as closure properties of the accepted languages).
+
+The cost of all of these features is /complication/ of the semantics of machines.
+Specifically,
+- Feature (1) ::
+  In order to define the transitive closure of the transition function,
+  we must define the notion of the ε-closure of a state
+  or ε-reachability from a state, since at each step any number
+  of ε-transitions may be “taken”.
+  - These must be recursive definitions, since for a state ~q~
+    a state ~q′~ may be connected to ~q~ by a chain of ε-transitions
+    of length greater than 1.
+  - The possibility of cycles in the ε-transition graph
+    makes this recursive definition difficult,
+    as we must ensure termination.
+- Features (2) and (3) ::
+  In order to define acceptance of a string by a machine,
+  we must existentially quantify over the start/final state sets.
+  - For instance, “there exists a start state ~s~ and a final state ~f~
+    such that ~f~ is reachable from ~s~ by the string ~xs~”,
+    - To be more precise, because the start/final state sets are likely to
+      be represented by predicates, this example should read
+      “there exist states ~s~ and ~f~ such that ~s~ is a start state,
+      ~f~ is a final state, and ~f~ is reachable from ~s~ by the string ~xs~”.
+
+*** Choice of features
+
+We choose as a canonical representation machines which include
+features (2) and (3), but not (1).
+
+We feel that the convenience of (2) and (3) outweigh
+the added implementation difficulty,
+but that this is not the case for (1).
+
+* Agda header
+
+#+begin_src agda2
+module Automata.Nondeterministic where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Level using ()
+  renaming (zero to ℓ₀)
+
+open import Data.Nat using (ℕ)
+open import Data.Product using (_×_)
+open import Data.Vec using (Vec ; [] ; _∷_)
+
+open import Relation.Unary using (Pred)
+open import Relation.Binary.PropositionalEquality using (_≡_)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Utilities.ExistsSyntax using (∃-syntax)
+----------------------------------------------------------------------
+#+end_src
+
+* Canonical nondeterministic automata
+
+Our canonical nondeterministic automata have the form
+#+begin_src text
+    ⟨ Q , Σ , S , F , Δ ⟩
+#+end_src
+where
+- ~Q~ is a set, called the /set of states/,
+- ~Σ~ is a set, called the /alphabet/,
+- ~S~ and ~F~ are unary relations (predicates) on states,
+  called the /start state predicate/ and /final state predicate/, and
+- ~Δ~ is a ternary relation between ~Q~, ~Σ~, and ~Q~
+  (in fact, a function from states to letters to /unary predicates/
+  on states).
+
+The definition is as a record; we include semantic functions definitions after
+the fields, since they will be frequently used.
+#+begin_src agda2
+record NDA (Σ : Set) : Set₁ where
+  constructor ⟨_,_,_,_⟩
+
+  field
+    Q : Set
+    S : Pred Q ℓ₀
+    F : Pred Q ℓ₀
+    Δ : Q → Σ → Pred Q ℓ₀
+
+  Δ* : Q → {n : ℕ} → Vec Σ n → Pred Q ℓ₀
+  Δ* q [] = q ≡_
+  Δ* q (x ∷ xs) q′ = ∃ q₀ ∶ Q • ((Δ q x q₀) × (Δ* q₀ xs q′))
+
+  Accepts : {n : ℕ} → Pred (Vec Σ n) ℓ₀
+  Accepts xs = ∃ q ∶ Q • (S q
+                       × ∃ q′ ∶ Q • ((F q′)
+                                  × (Δ* q xs q′)))
+
+  -- :TODO: are these useful?
+  _-Reachable : ℕ → Q → Pred Q ℓ₀
+  _-Reachable n q q′ = ∃ xs ∶ Vec Σ n • (Δ* q xs q′)
+
+  Reachable : Q → Pred Q ℓ₀
+  Reachable q q′ = ∃ n ∶ ℕ • (n -Reachable) q q′
+#+end_src
+
+** Level polymorphic version
+
+#+begin_example agda2
+record NDA {ℓ Σℓ : Level} (Σ : Set Σℓ) : Set (ℓ-suc (ℓ ⊔ Σℓ)) where
+  constructor ⟨_,_,_,_⟩
+
+  field
+    Q : Set ℓ
+    S : Pred Q ℓ
+    F : Pred Q ℓ
+    Δ : Q → Σ → Pred Q (ℓ ⊔ Σℓ)
+
+  Δ* : Q → {n : ℕ} → Vec Σ n → Pred Q (ℓ ⊔ Σℓ)
+  Δ* q [] q′ = Lift (ℓ ⊔ Σℓ) (q ≡ q′)
+  Δ* q (x ∷ xs) q′ = ∃ q₀ ∶ Q • ((Δ q x q₀) × (Δ* q₀ xs q′))
+
+  Accepts : {n : ℕ} → Pred (Vec Σ n) (ℓ ⊔ Σℓ)
+  Accepts xs = ∃ q ∶ Q • (S q
+                       × ∃ q′ ∶ Q • ((F q′)
+                                  × (Δ* q xs q′)))
+
+  -- :TODO: are these useful?
+  _-Reachable : ℕ → Q → Pred Q (ℓ ⊔ Σℓ)
+  _-Reachable n q q′ = ∃ xs ∶ Vec Σ n • (Δ* q xs q′)
+
+  Reachable : Q → Pred Q (ℓ ⊔ Σℓ)
+  Reachable q q′ = ∃ n ∶ ℕ • (n -Reachable) q q′
+#+end_example

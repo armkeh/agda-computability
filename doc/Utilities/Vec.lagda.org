@@ -1,0 +1,5 @@
+#+Title: Properties of vectors which seem missing from the standard library
+#+Author: Mark Armstrong
+#+Description: As the title says.
+
+:TODO: Identity of ++.

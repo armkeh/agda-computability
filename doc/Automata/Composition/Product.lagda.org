@@ -1,0 +1,166 @@
+#+Title: “Products” of nondeterministic automata
+#+Author: Mark Armstrong
+#+Description: Composing NDA's into a machine which accepts
+#+Description: the product of their accepted languages.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composition/Product.agda
+
+* Introduction
+
+We can combine two NDA's, say ~M~ and ~N~,
+into a “product machine” ~M ⨉ N~.
+
+* Agda header                                   :noexport:
+
+Notice the module parameters Σ₁ and Σ₂ here.
+#+begin_src agda2
+module Automata.Composition.Product (Σ₁ Σ₂ : Set) where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Data.Nat using (ℕ)
+open import Data.Product using (_×_ ; _,_ ; proj₁ ; proj₂)
+open import Data.Vec using (Vec ; [] ; _∷_ ; zip)
+
+open import Relation.Binary.PropositionalEquality using (refl)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Automata.Nondeterministic
+----------------------------------------------------------------------
+#+end_src
+
+* Products of canonical nondeterministic automata
+
+#+begin_src agda2
+Σ : Set
+Σ = Σ₁ × Σ₂
+
+_⨉_ : (M : NDA Σ₁) (N : NDA Σ₂) → NDA Σ
+⟨ Q₁ , S₁ , F₁ , Δ₁ ⟩ ⨉ ⟨ Q₂ , S₂ , F₂ , Δ₂ ⟩ = ⟨ Q , S , F , Δ ⟩
+  where
+    Q : Set
+    Q = Q₁ × Q₂
+
+    S : Q → Set
+    S (q , r) = S₁ q × S₂ r
+
+    F : Q → Set
+    F (q , r) = F₁ q × F₂ r
+
+    Δ : Q → Σ → Q → Set
+    Δ (q , r) (c , d) (q′ , r′) = Δ₁ q c q′ × Δ₂ r d r′
+#+end_src
+
+* Proving that ~M ⨉ N~ is a product
+
+** Transition paths
+
+#+begin_src agda2
+AllPaths : {M : NDA Σ₁} {N : NDA Σ₂}
+         → let Q₁ = NDA.Q M
+               Q₂ = NDA.Q N
+               Δ*₁ = NDA.Δ* M
+               Δ*₂ = NDA.Δ* N
+               Δ* = NDA.Δ* (M ⨉ N)
+           in
+           {n : ℕ}
+         → {q : Q₁} → {ys : Vec Σ₁ n} → {q′ : Q₁}
+         → Δ*₁ q ys q′
+         → {r : Q₂} → {zs : Vec Σ₂ n} → {r′ : Q₂}
+         → Δ*₂ r zs r′
+         → let xs = zip ys zs in
+           Δ* (q , r) xs (q′ , r′)
+AllPaths {ys = []} refl {zs = []} refl = refl
+AllPaths {ys = y ∷ ys} (q₁ , Δ-q-y-q₁ , Δ*-q₁-ys-q′)
+         {zs = z ∷ zs} (r₁ , Δ-r-z-r₁ , Δ*-r₁-zs-r′) =
+  (q₁ , r₁) , (Δ-q-y-q₁ , Δ-r-z-r₁) , AllPaths Δ*-q₁-ys-q′ Δ*-r₁-zs-r′
+#+end_src
+
+#+begin_src agda2
+OnlyPaths₁ : {M : NDA Σ₁} {N : NDA Σ₂}
+           → let Q₁ = NDA.Q M
+                 Q₂ = NDA.Q N
+                 Δ*₁ = NDA.Δ* M
+                 Δ*₂ = NDA.Δ* N
+                 Δ* = NDA.Δ* (M ⨉ N)
+             in
+             {n : ℕ}
+           → {q : Q₁} → {ys : Vec Σ₁ n} → {q′ : Q₁}
+           → {r : Q₂} → {zs : Vec Σ₂ n} → {r′ : Q₂}
+           → let xs = zip ys zs in
+             Δ* (q , r) xs (q′ , r′)
+           → Δ*₁ q ys q′
+OnlyPaths₁ {ys = []} {zs = []} refl = refl
+OnlyPaths₁ {ys = y ∷ ys} {zs = z ∷ zs}
+          ((q₁ , r₁) , (Δ-q-y-q₁ , Δ-r-z-r₁) , Δ*-[q₁,r₁]-xs-[q′,r′]) =
+            q₁ , Δ-q-y-q₁ , OnlyPaths₁ Δ*-[q₁,r₁]-xs-[q′,r′]
+#+end_src
+
+#+begin_src agda2
+OnlyPaths₂ : {M : NDA Σ₁} {N : NDA Σ₂}
+           → let Q₁ = NDA.Q M
+                 Q₂ = NDA.Q N
+                 Δ*₁ = NDA.Δ* M
+                 Δ*₂ = NDA.Δ* N
+                 Δ* = NDA.Δ* (M ⨉ N)
+             in
+             {n : ℕ}
+           → {q : Q₁} → {ys : Vec Σ₁ n} → {q′ : Q₁}
+           → {r : Q₂} → {zs : Vec Σ₂ n} → {r′ : Q₂}
+           → let xs = zip ys zs in
+             Δ* (q , r) xs (q′ , r′)
+           → Δ*₂ r zs r′
+OnlyPaths₂ {ys = []} {zs = []} refl = refl
+OnlyPaths₂ {ys = y ∷ ys} {zs = z ∷ zs}
+           ((q₁ , r₁) , (Δ-q-y-q₁ , Δ-r-z-r₁) , Δ*-[q₁,r₁]-xs-[q′,r′]) =
+             r₁ , Δ-r-z-r₁ , OnlyPaths₂ Δ*-[q₁,r₁]-xs-[q′,r′]
+#+end_src
+
+** Acceptance
+
+#+begin_src agda2
+AcceptsAll : {M : NDA Σ₁} {N : NDA Σ₂}
+           → {n : ℕ}
+           → (ys : Vec Σ₁ n)
+           → (zs : Vec Σ₂ n)
+           → let xs = zip ys zs in
+             NDA.Accepts M ys
+           → NDA.Accepts N zs
+           → NDA.Accepts (M ⨉ N) xs
+AcceptsAll ys zs
+           (q , Sq , q′ , Fq′ , Δ*-q-ys-q′)
+           (r , Sr , r′ , Fr′ , Δ*-r-zs-r′) =
+  (q , r) , (Sq , Sr) , (q′ , r′) , (Fq′ , Fr′) , AllPaths Δ*-q-ys-q′ Δ*-r-zs-r′
+#+end_src
+
+#+begin_src agda2
+AcceptsOnly₁ : {M : NDA Σ₁} {N : NDA Σ₂}
+             → {n : ℕ}
+             → (ys : Vec Σ₁ n)
+             → (zs : Vec Σ₂ n)
+             → let xs = zip ys zs in
+               NDA.Accepts (M ⨉ N) xs
+             → NDA.Accepts M ys
+AcceptsOnly₁ ys zs
+            ((q  , r)  , (Sq  , Sr)
+           , (q′ , r′) , (Fq′ , Fr′)
+           , Δ*-[q,r]-xs-[q′,r′]) =
+  q , Sq , q′ , Fq′ , OnlyPaths₁ Δ*-[q,r]-xs-[q′,r′]
+#+end_src
+
+#+begin_src agda2
+AcceptsOnly₂ : {M : NDA Σ₁} {N : NDA Σ₂}
+             → {n : ℕ}
+             → (ys : Vec Σ₁ n)
+             → (zs : Vec Σ₂ n)
+             → let xs = zip ys zs in
+               NDA.Accepts (M ⨉ N) xs
+             → NDA.Accepts N zs
+AcceptsOnly₂ ys zs
+            ((q  , r)  , (Sq  , Sr)
+           , (q′ , r′) , (Fq′ , Fr′)
+           , Δ*-[q,r]-xs-[q′,r′]) =
+  r , Sr , r′ , Fr′ , OnlyPaths₂ Δ*-[q,r]-xs-[q′,r′]
+#+end_src

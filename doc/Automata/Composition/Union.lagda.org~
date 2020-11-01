@@ -1,0 +1,55 @@
+#+Title: “Unions” of nondeterministic automata
+#+Author: Mark Armstrong
+#+Description: Composing NDA's into a machine which accepts
+#+Description: a union of their accepted languages.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../../src/Automata/Composiiton/Union.agda
+
+* Introduction
+
+We can “union” two NDA's, say ~M~ and ~N~; 
+* Unions of canonical nondeterministic automata
+
+As a reminder, our canonical representation of
+nondeterministic automata
+- may have multiple start and final states, but
+- do not have ε-transitions.
+
+** Impact of canonical representation features
+
+The allowance for multiple start and final states
+make the definition of a machine
+
+** The union
+
+Given NDA's ~M~ and ~N~, we will define an NDA ~M ∪ N~ such that 
+- the set of states of ~M ∪ N~ is the disjoint union of
+  the sets of states of ~M~ and ~N~,
+- the set of start (final) states of ~M ∪ N~ is the union of
+  the sets of start (final) states of ~M~ and ~N~, and
+- the transition function of ~M ∪ N~ contains the transitions
+  from ~M~ and from ~N~, and no others.
+It should be intuitive that this machine accepts the union
+of the languages accepted by ~M~ and ~N~, and this is proven
+afterwards.
+#+begin_src agda2
+    _∪_ : (M N : NDA |Σ|) → NDA |Σ|
+    ⟨ Q₁ , S₁ , F₁ , Δ₁ ⟩ ∪ ⟨ Q₂ , S₂ , F₂ , Δ₂ ⟩ = ⟨ Q , S , F , Δ ⟩
+      where
+        Q : Set
+        Q = Q₁ ⊎ Q₂
+  
+        S : Q → Set
+        S (inj₁ q) = S₁ q
+        S (inj₂ q) = S₂ q
+  
+        F : Q → Set
+        F (inj₁ q) = F₁ q
+        F (inj₂ q) = F₂ q
+  
+        Δ : Q → Σ → Q → Set
+        Δ (inj₁ q) c (inj₁ q′) = Δ₁ q c q′
+        Δ (inj₂ q) c (inj₂ q′) = Δ₂ q c q′
+        {-# CATCHALL #-}
+        Δ _ _ _ = ⊥ -- No connections between the machines
+#+end_src

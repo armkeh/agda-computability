@@ -1,0 +1,64 @@
+#+Title: Languages
+#+Author: Mark Armstrong
+#+Description: Nondeterministic automata, though not necessarily
+#+Description: with finitely many states.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../src/Automata/Nondeterministic.agda
+
+* Introduction
+
+:TODO: These are not languages over finite alphabets.
+Those can be treated as a special case;
+it's usually easier to prove several things when not involving ~Fin~.
+
+* Agda header
+
+#+begin_src agda2
+module Language where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Level using ()
+  renaming (zero to ℓ₀)
+
+open import Size using (Size)
+
+open import Data.Nat using (ℕ)
+open import Data.Product using (_×_ ; _,_ ; Σ-syntax)
+open import Data.Vec using (Vec ; [] ; _∷_)
+open import Codata.Stream using (Stream)
+
+open import Relation.Unary using (Pred)
+--open import Relation.Binary.PropositionalEquality using (_≡_)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+--open import Utilities.ExistsSyntax using (∃-syntax)
+----------------------------------------------------------------------
+#+end_src
+
+* Languages
+
+#+begin_src agda2
+StringFormer : Set₁
+StringFormer = (Σ : Set) → Set
+#+end_src
+
+- (Finite length) words are represented as ~Vector~'s
+  (paired with their length.)
+- (Infinite length) sequences are represented as ~Stream~'s
+  (paired with their sizes.)
+#+begin_src agda2
+Word : StringFormer
+Word Σ = Σ[ n ∈ ℕ ] Vec Σ n
+
+Sequence : StringFormer
+Sequence Σ = Σ[ ι ∈ Size ] Stream Σ ι
+#+end_src
+
+Languages consist of a string former and have certain properties.
+#+begin_src agda2
+Language : (Σ : Set) → StringFormer → Set₁
+Language Σ _∞ = Pred (_∞ Σ) ℓ₀
+#+end_src

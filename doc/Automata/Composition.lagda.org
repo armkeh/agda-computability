@@ -1,0 +1,49 @@
+#+Title: Composition of machines
+#+Author: Mark Armstrong
+#+Description: Definitions of properties compositions may have.
+#+Startup: noindent
+#+Property: header-args:agda2 :tangle ../../src/Automata/Nondeterministic.agda
+
+* Introduction
+
+:TODO:
+
+* Agda header
+
+#+begin_src agda2
+module Automata.Composition where
+#+end_src
+
+#+begin_src agda2
+-- Standard libraries imports ----------------------------------------
+open import Level using ()
+  renaming (zero to ℓ₀)
+
+open import Data.Nat using (ℕ)
+--open import Data.Product using (_×_)
+open import Data.Vec using (Vec)
+
+open import Relation.Unary using (Pred)
+--open import Relation.Binary.PropositionalEquality using (_≡_)
+----------------------------------------------------------------------
+
+-- Thesis imports ----------------------------------------------------
+open import Language
+open import Automata.Nondeterministic
+open NDA
+open import Utilities.ExistsSyntax using (∃-syntax)
+----------------------------------------------------------------------
+#+end_src
+
+* Closures
+
+#+begin_src agda2
+record ClosedUnder {Σ Σ₁ Σ₂ : Set}
+                   (_⊕_ : (Language Σ₁ Word) → (Language Σ₂ Word) → (Language Σ Word))
+                 : Set₁ where
+  field
+    isClosed : {M : NDA Σ₁} {N : NDA Σ₂}
+             → {L₁ : Language Σ₁ Word} {L₂ : Language Σ₂ Word}
+             → AcceptsLanguage M L₁ → AcceptsLanguage N L₂
+             → ∃ M⊕N ∶ NDA Σ • AcceptsLanguage M⊕N (L₁ ⊕ L₂)
+#+end_src

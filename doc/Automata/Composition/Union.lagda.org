@@ -33,6 +33,7 @@ open import Relation.Binary.PropositionalEquality
 
 -- Thesis imports ----------------------------------------------------
 open import Automata.Nondeterministic
+open import Automata.Composition
 ----------------------------------------------------------------------
 #+end_src
 
@@ -310,6 +311,16 @@ N-Accepts⇒M∪N-Accepts (x ∷ xs)
     , inj₂ q′ , F-q′
     , inj₂ q₀ , Δ-q-x-q₀
     , N-Δ*⇒M∪N-Δ* q₀ xs q′ Δ*-q₀-xs-q′ )
+#+end_src
+
+These two facts let us prove that NDA's are closed under
+disjoint union on languages.
+#+begin_src agda2
+ClosedUnderUnion : ClosedUnder {Σ} λ P₁ →  λ P₂ → λ xs → P₁ xs ⊎ P₂ xs
+ClosedUnder.isClosed ClosedUnderUnion {M} {N} M-accepts-L₁ N-accepts-L₂ =
+    (M ∪ N)
+  , λ { xs (inj₁ L₁-xs) → M-Accepts⇒M∪N-Accepts xs (M-accepts-L₁ xs L₁-xs)
+      ; xs (inj₂ L₂-xs) → N-Accepts⇒M∪N-Accepts xs (N-accepts-L₂ xs L₂-xs) }
 #+end_src
 
 *** “If ~M ∪ N~ accepts ~xs~, then at least one of ~M~ or ~N~ accepts ~xs~” 

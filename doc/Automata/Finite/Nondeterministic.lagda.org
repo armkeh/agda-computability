@@ -9,11 +9,25 @@
 * Agda header                                   :noexport:
 
 #+begin_src agda2
-module Automata.Finite.Nondeterministic
+module Automata.Finite.Nondeterministic where
+#+end_src
+
+#+begin_src agda2
+open import Relation.Nullary
+#+end_src
+
+#+begin_src agda2
+open import Automata.Nondeterministic
 #+end_src
 
 * Definition
 
 #+begin_src agda2
+record NFA (Σ : Set) : Set₁ where
 
+  field
+    M : NDA Σ
+    Σ-finite : {!!} -- A bijection between Σ and Fin n for some n
+    
+  open NDA M
 #+end_src

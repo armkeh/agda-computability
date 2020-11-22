@@ -25,9 +25,9 @@ makes several proofs easier. Notable difficulties include:
 There are three significant design decisions to be made
 in the implementation of these nondeterministic machines.
 Specifically, we must choose whether to allow
-1) ε-transitions,
-2) multiple start states, and/or
-3) multiple final states.
+1. ε-transitions,
+2. multiple start states, and/or
+3. multiple final states.
 All three of these features obviously do not change
 the expressiveness of the machine;
 given a machine with these features, we can always obtain
@@ -100,7 +100,7 @@ open import Level using ()
   renaming (zero to ℓ₀)
 
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_)
+open import Data.Product using (_×_ ; _,_ ; Σ-syntax)
 open import Data.Vec using (Vec ; [] ; _∷_)
 
 open import Relation.Unary using (Pred)
@@ -108,6 +108,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 ----------------------------------------------------------------------
 
 -- Thesis imports ----------------------------------------------------
+open import Language
 open import Utilities.ExistsSyntax using (∃-syntax)
 ----------------------------------------------------------------------
 #+end_src
@@ -138,7 +139,10 @@ record NDA (Σ : Set) : Set₁ where
     S : Pred Q ℓ₀
     F : Pred Q ℓ₀
     Δ : Q → Σ → Pred Q ℓ₀
+#+end_src
 
+Now we can define how these machines act upon finite strings of input.
+#+begin_src agda2
   Δ* : Q → {n : ℕ} → Vec Σ n → Pred Q ℓ₀
   Δ* q [] = q ≡_
   Δ* q (x ∷ xs) q′ = ∃ q₀ ∶ Q • ((Δ q x q₀) × (Δ* q₀ xs q′))
@@ -147,7 +151,21 @@ record NDA (Σ : Set) : Set₁ where
   Accepts xs = ∃ q ∶ Q • (S q
                        × ∃ q′ ∶ Q • ((F q′)
                                   × (Δ* q xs q′)))
+#+end_src
 
+We should also generalise to infinite length strings;
+this definition of the acceptance of a language
+has been made with this in mind. ~Language Σ Word~ is the set
+of predicates over vectors over ~Σ~; later, this should be generalised
+to sets other than ~Word~.
+#+begin_src agda2
+  AcceptsLanguage : Pred (Language Σ Word) ℓ₀
+  AcceptsLanguage P = {n : ℕ} → (xs : Vec Σ n) → P (n , xs) → Accepts xs
+#+end_src
+
+These notions of reachability may be useful for some proofs.
+At the time of writing, I have not used them.
+#+begin_src agda2
   -- :TODO: are these useful?
   _-Reachable : ℕ → Q → Pred Q ℓ₀
   _-Reachable n q q′ = ∃ xs ∶ Vec Σ n • (Δ* q xs q′)
@@ -158,6 +176,7 @@ record NDA (Σ : Set) : Set₁ where
 
 ** Level polymorphic version
 
+This version is not yet used or maintained.
 #+begin_example agda2
 record NDA {ℓ Σℓ : Level} (Σ : Set Σℓ) : Set (ℓ-suc (ℓ ⊔ Σℓ)) where
   constructor ⟨_,_,_,_⟩
@@ -176,7 +195,7 @@ record NDA {ℓ Σℓ : Level} (Σ : Set Σℓ) : Set (ℓ-suc (ℓ ⊔ Σℓ)) 
   Accepts xs = ∃ q ∶ Q • (S q
                        × ∃ q′ ∶ Q • ((F q′)
                                   × (Δ* q xs q′)))
-
+                                  
   -- :TODO: are these useful?
   _-Reachable : ℕ → Q → Pred Q (ℓ ⊔ Σℓ)
   _-Reachable n q q′ = ∃ xs ∶ Vec Σ n • (Δ* q xs q′)

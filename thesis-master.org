@@ -507,4 +507,34 @@ Refer to the Agda documentation for details:
 [[https://agda.readthedocs.io/en/v2.6.1/language/prop.html]].
 
 ** Automata notes
+** Meetings
+
+*** Committee meeting 2020
+
+**** Mark Armstrong 2020 committee meeting report
+
+***** Activities this year
+
+I cannot say I have made significant progress on my thesis this year.
+
+As an outcome of last year's meeting, I was to
+- establish weekly meetings with Wolfram and Jeff,
+- make some progress towards publishable results by spring, and
+- provide this committee with some report of progress
+  during the spring.
+This was not done, at least partly because of the pandemic.
+  
+What I have done in this past year:
+- Worked on a much cleaner representation of automata,
+  leaving out the issue of finiteness.
+  This lead to much easier proofs about composition,
+  which I worked on first to confirm that the representation chosen
+  was well-suited to the task.
+- Since March, this work has unfortunately been sporadic.
+  - More often, I have worked on small tasks in Agda
+    which haven't produced much of use.
+- Since July, some family matters along with preparation for
+  teaching 3mi3 prevented further work on the thesis.
+
+***** Samples of code
 

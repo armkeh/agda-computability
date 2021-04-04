@@ -1,0 +1,113 @@
+#+Title: Instances of language types
+#+Author: Mark Armstrong
+#+Description: Languages for us use a generic “sequence” interface.
+#+Description: This file contains implementations includings lists and streams.
+#+Startup: noindent
+
+#+begin_src agda2
+module Language.Instances where
+
+open import Size using (Size ; ↑_ ; ∞ ; _⊔ˢ_)
+open import Data.Empty using (⊥ ; ⊥-elim)
+open import Data.Unit using (tt)
+open import Data.Bool using (true ; false)
+open import Data.Product using (Σ-syntax ; _,_)
+open import Data.Maybe using (nothing ; just)
+open import Data.Maybe.Relation.Unary.Any using (just)
+open import Relation.Nullary using (_because_ ; ofʸ ; ofⁿ)
+open import Relation.Binary.PropositionalEquality using (_≡_ ; refl ; _≢_)
+
+-- Thesis imports
+open import Language
+#+end_src
+
+* Lists
+
+To represent finite strings, we may use either lists or vectors.
+We begin with lists, which are a little simpler, as here vectors
+will have to be packaged with their length parameters.
+#+begin_src agda2
+module List where
+  open import Data.List using (List ; [] ; _∷_)
+
+  nonempty-head : {Σ : Set} → (xs : List Σ) → (xs ≢ []) → Σ
+  nonempty-head [] []≢[] = ⊥-elim ([]≢[] refl)
+  nonempty-head (x ∷ _) _ = x
+  
+  nonempty-tail : {Σ : Set} → (xs : List Σ) → (xs ≢ []) → List Σ
+  nonempty-tail [] []≢[] = ⊥-elim ([]≢[] refl)
+  nonempty-tail (_ ∷ xs) _ = xs
+  
+  FiniteString : (Σ : Set) → String Σ
+  FiniteString Σ = 
+    record
+      { Carrier = List Σ
+      ; ε = just []
+      ; Empty = _≡ []
+      ; Empty-is-ε = λ x≡[] → just tt , x≡[]
+      ; Empty? = λ { [] → true because ofʸ refl
+                   ; (_ ∷ _) → false because ofⁿ λ () }
+      ; prepend = _∷_
+      ; hd = nonempty-head
+      ; tl = nonempty-tail
+      ; prepend-nonempty = λ ()
+      ; hd-prepend = λ c s → refl
+      ; tl-prepend = λ c s → refl
+      ; prepend-hd-tl = λ { [] []≢[] → ⊥-elim ([]≢[] refl)
+                          ; (x ∷ s) _ → refl }
+      }
+#+end_src
+Development note: The proofs
+of ~prepend-nonempty~, ~hd-prepend~ and ~tl-prepend~ were
+all completable by auto.
+The proof of ~prepend-hd-tl~ only required a bit of pattern matching.
+
+* TODO Vectors
+
+* Streams
+
+#+begin_src agda2
+module Stream where
+  open import Codata.Thunk using (force)
+  open import Codata.Stream using (Stream ; _∷_)
+  
+  InfiniteString : (Σ : Set) → String Σ
+  InfiniteString Σ =
+    record
+        { Carrier = Σ[ i ∈ Size ] Stream Σ i
+        ; ε = nothing
+        ; Empty = λ _ → ⊥
+        ; Empty-is-ε = λ { () }
+        ; Empty? = λ s → false because ofⁿ λ x → x
+        ; prepend = λ { x (i , ys) → (↑ i) , (x ∷ λ where .force → ys) }
+        ; hd = λ { (_ , x ∷ _) _ → x }
+        ; tl = λ { (i , _ ∷ xs) _ →  {!!} , {!!} .force }
+        ; prepend-nonempty = {!!}
+        ; hd-prepend = {!!}
+        ; tl-prepend = {!!}
+        ; prepend-hd-tl = {!!}
+        }
+#+end_src
+
+* COMMENT Rough work
+
+# Copied over from ../Language.lagda.org initially.
+
+, we will represent finite strings over an alphabet ~Σ~ in Agda
+using vectors (lists with the length denoted in their type) over ~Σ~.
+Infinite strings we similarly represent using (co-inductively defined) streams,
+and potentially infinite strings using colists.
+For example,
+#+begin_example agda2
+-- Bits can be 𝟘 or 𝟙.
+data Bit : Set where
+  𝟘 𝟙 : Bit
+
+-- A finite sequence of bits of specified length 3.
+xs : Vec Bit 3
+xs = 𝟘 ∷ 𝟘 ∷ 𝟘 ∷ []
+
+-- An infinite sequence of bits (all 𝟘.)
+ys : {ι : Size} → Stream Bit ι
+ys = 𝟘 ∷ λ where .force → ys
+#+end_example

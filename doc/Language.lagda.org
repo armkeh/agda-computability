@@ -7,9 +7,19 @@
 
 * Introduction
 
-:TODO: These are not languages over finite alphabets.
-Those can be treated as a special case;
-it's usually easier to prove several things when not involving ~Fin~.
+In this project, We are interested with machines operating
+not just on finite strings, but also
+potentially infinite or (assuredly) infinite strings.
+
+However, we want our reasoning to be uniform regardless of
+the nature of strings which we process.
+To accomplish this, we establish here an interface 
+for strings, which have as reasonable instances
+the classes of finite, potentially infinite and infinite strings.
+
+Our canonical representations of
+the classes of finite, potentially infiniite and infinite strings
+can be found in [[./Languages/Instances.lagda.org]].
 
 * Agda header
 
@@ -22,15 +32,25 @@ module Language where
 open import Level using ()
   renaming (zero to ℓ₀)
 
-open import Size using (Size)
+open import Size using (Size ; Size<_ ; ↑_ ; _⊔ˢ_ ; ∞)
 
-open import Data.Nat using (ℕ)
+open import Data.Unit using (tt)
+open import Data.Empty using (⊥-elim)
+open import Data.Bool using (Bool ; true ; false ; T)
+open import Data.Nat using (ℕ ; zero ; suc)
 open import Data.Product using (_×_ ; _,_ ; Σ-syntax)
-open import Data.Vec using (Vec ; [] ; _∷_)
-open import Codata.Stream using (Stream)
+open import Data.Sum using (_⊎_)
+open import Data.Maybe using (Maybe ; just ; nothing ; Is-just ; to-witness)
+open import Data.Maybe.Relation.Unary.Any using (just)
+open import Codata.Thunk using (Thunk ; force)
+open import Codata.Stream using (Stream ; _∷_)
 
+open import Relation.Nullary using (¬_ ; Dec ; _because_ ; ofʸ ; ofⁿ)
+open import Relation.Nullary.Decidable using ()
 open import Relation.Unary using (Pred)
---open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_ ; refl)
+
+open import Function using (case_of_)
 ----------------------------------------------------------------------
 
 -- Thesis imports ----------------------------------------------------
@@ -40,9 +60,45 @@ open import Relation.Unary using (Pred)
 
 * Languages
 
+An interface of strings over an alphabet ~Σ~ must consist of
+- the set of strings,
+  - possibly containing an empty string,
+- a means to prepend a character to a string,
+- a means to get  the first character of a string (unless the string is empty), and
+- a means to drop the first character of a string (again, unless the string is empty.)
 #+begin_src agda2
-StringFormer : Set₁
-StringFormer = (Σ : Set) → Set
+record String (Σ : Set) : Set₁ where
+  field
+    Carrier : Set
+    ε : Maybe Carrier
+    Empty : Pred Carrier ℓ₀
+    Empty-is-ε : {s : Carrier} → Empty s → Σ[ pf ∈ Is-just ε ] (s ≡ to-witness pf)
+
+  Nonempty : Pred Carrier ℓ₀
+  Nonempty s = ¬ (Empty s)
+
+  field
+    Empty? : (s : Carrier) → Dec (Empty s)
+ 
+  Nonempty? : (s : Carrier) → Dec (Nonempty s)
+  Nonempty? s = case Empty? s of λ
+                  { (false because ofⁿ ¬p) → true  because ofʸ ¬p
+                  ; (true  because ofʸ  p) → false because ofⁿ λ z → z p }
+
+  field
+
+    prepend : Σ → Carrier → Carrier
+    hd : (s : Carrier) → Nonempty s → Σ
+    tl : (s : Carrier) → Nonempty s → Carrier
+  
+    prepend-nonempty : {c : Σ} → {s : Carrier} → Nonempty (prepend c s)
+
+    hd-prepend : (c : Σ) → (s : Carrier) →
+                 hd (prepend c s) prepend-nonempty ≡ c
+    tl-prepend : (c : Σ) → (s : Carrier) →
+                 tl (prepend c s) prepend-nonempty ≡ s
+    prepend-hd-tl : (s : Carrier) → (s-nonempty : Nonempty s)
+                  → prepend (hd s s-nonempty) (tl s s-nonempty) ≡ s
 #+end_src
 
 - (Finite length) words are represented as ~Vector~'s
@@ -50,15 +106,36 @@ StringFormer = (Σ : Set) → Set
 - (Infinite length) sequences are represented as ~Stream~'s
   (paired with their sizes.)
 #+begin_src agda2
-Word : StringFormer
-Word Σ = Σ[ n ∈ ℕ ] Vec Σ n
+open import Data.Vec using (Vec ; [] ; _∷_)
 
-Sequence : StringFormer
-Sequence Σ = Σ[ ι ∈ Size ] Stream Σ ι
+Word : (Σ : Set) → String Σ
+Word Σ = record
+           { Carrier = Σ[ n ∈ ℕ ] Vec Σ n
+           ; ε = just (0 , [])
+           ; Empty = λ x → x ≡ (0 , [])
+           ; Empty? = λ { (0 , []) → true because ofʸ refl
+                        ; (suc _ , _ ∷ _) → false because ofⁿ (λ ()) }
+           ; Empty-is-ε = λ { {.0 , .[]} refl → just tt , refl }
+           ; prepend = λ { x (n , xs) → suc n , x ∷ xs }
+           ; hd = λ { (zero , []) nonempty → ⊥-elim (nonempty refl)
+                    ; (suc _ , x ∷ _) _ → x }
+           ; tl = λ { (zero , []) nonempty → ⊥-elim (nonempty refl)
+                    ; (suc n , _ ∷ xs) _ → n , xs }
+           ; prepend-nonempty = λ ()
+           ; hd-prepend = λ c s → refl
+           ; tl-prepend = λ c s → refl
+           ; prepend-hd-tl = λ { (zero , []) nonempty → ⊥-elim (nonempty refl)
+                               ; (suc _ , _ ∷ _) _ → refl }
+           }
+-- Σ[ n ∈ ℕ ] Vec Σ n
+
+--Sequence : (Σ : Set) → String Σ
+--Sequence Σ = {!!}
+-- Σ[ ι ∈ Size ] Stream Σ ι
 #+end_src
 
-Languages consist of a string former and have certain properties.
+Languages are predicates over strings.
 #+begin_src agda2
-Language : (Σ : Set) → StringFormer → Set₁
-Language Σ _∞ = Pred (_∞ Σ) ℓ₀
+Language : (Σ : Set) → String Σ → Set₁
+Language Σ S = Pred (String.Carrier S) ℓ₀
 #+end_src

@@ -1,13 +1,12 @@
 #+Title: Languages
 #+Author: Mark Armstrong
-#+Description: Nondeterministic automata, though not necessarily
-#+Description: with finitely many states.
+#+Description: A generic concept of Language used in this project.
 #+Startup: noindent
-#+Property: header-args:agda2 :tangle ../../src/Automata/Nondeterministic.agda
+#+Property: header-args:agda2 :tangle ../../src/Language.agda
 
 * Introduction
 
-In this project, We are interested with machines operating
+In this project, we are interested with machines operating
 not just on finite strings, but also
 potentially infinite or (assuredly) infinite strings.
 
@@ -69,35 +68,35 @@ An interface of strings over an alphabet ~Σ~ must consist of
 #+begin_src agda2
 record String (Σ : Set) : Set₁ where
   field
-    Carrier : Set
-    ε : Maybe Carrier
-    Empty : Pred Carrier ℓ₀
-    Empty-is-ε : {s : Carrier} → Empty s → Σ[ pf ∈ Is-just ε ] (s ≡ to-witness pf)
+    Carrier : Size → Set
+    ε : {i : Size} → Maybe (Carrier i)
+    Empty : {i : Size} → Pred (Carrier i) ℓ₀
+    Empty-is-ε : {i : Size} → {s : Carrier i} → Empty s → Σ[ pf ∈ Is-just ε ] (s ≡ to-witness pf)
 
-  Nonempty : Pred Carrier ℓ₀
+  Nonempty : ∀ {i : Size} → Pred (Carrier i) ℓ₀
   Nonempty s = ¬ (Empty s)
 
   field
-    Empty? : (s : Carrier) → Dec (Empty s)
+    Empty? : {i : Size} → (s : Carrier i) → Dec (Empty s)
  
-  Nonempty? : (s : Carrier) → Dec (Nonempty s)
+  Nonempty? : {i : Size} → (s : Carrier i) → Dec (Nonempty s)
   Nonempty? s = case Empty? s of λ
                   { (false because ofⁿ ¬p) → true  because ofʸ ¬p
                   ; (true  because ofʸ  p) → false because ofⁿ λ z → z p }
 
   field
 
-    prepend : Σ → Carrier → Carrier
-    hd : (s : Carrier) → Nonempty s → Σ
-    tl : (s : Carrier) → Nonempty s → Carrier
+    prepend : {i : Size} → Σ → Carrier i → Carrier (↑ i)
+    hd : {i : Size} → (s : Carrier i) → Nonempty s → Σ
+    tl : {i : Size} {j : Size< i} → (s : Carrier i) → Nonempty s → Carrier j
   
-    prepend-nonempty : {c : Σ} → {s : Carrier} → Nonempty (prepend c s)
+    prepend-nonempty : {i : Size} → {c : Σ} {s : Carrier i} → Nonempty (prepend c s)
 
-    hd-prepend : (c : Σ) → (s : Carrier) →
+    hd-prepend : {i : Size} (c : Σ) → (s : Carrier i) →
                  hd (prepend c s) prepend-nonempty ≡ c
-    tl-prepend : (c : Σ) → (s : Carrier) →
+    tl-prepend : {i : Size} (c : Σ) → (s : Carrier i) →
                  tl (prepend c s) prepend-nonempty ≡ s
-    prepend-hd-tl : (s : Carrier) → (s-nonempty : Nonempty s)
+    prepend-hd-tl : {i : Size} (s : Carrier (↑ i)) → (s-nonempty : Nonempty s)
                   → prepend (hd s s-nonempty) (tl s s-nonempty) ≡ s
 #+end_src
 
@@ -105,7 +104,7 @@ record String (Σ : Set) : Set₁ where
   (paired with their length.)
 - (Infinite length) sequences are represented as ~Stream~'s
   (paired with their sizes.)
-#+begin_src agda2
+#+begin_example agda2
 open import Data.Vec using (Vec ; [] ; _∷_)
 
 Word : (Σ : Set) → String Σ
@@ -132,10 +131,10 @@ Word Σ = record
 --Sequence : (Σ : Set) → String Σ
 --Sequence Σ = {!!}
 -- Σ[ ι ∈ Size ] Stream Σ ι
-#+end_src
+#+end_example
 
 Languages are predicates over strings.
 #+begin_src agda2
-Language : (Σ : Set) → String Σ → Set₁
-Language Σ S = Pred (String.Carrier S) ℓ₀
+--Language : (Σ : Set) → String Σ → Set₁
+--Language Σ S = Pred (String.Carrier S) ℓ₀
 #+end_src

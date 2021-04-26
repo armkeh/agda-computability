@@ -41,7 +41,7 @@ module List where
   FiniteString : (Σ : Set) → String Σ
   FiniteString Σ = 
     record
-      { Carrier = List Σ
+      { Carrier = λ _ → List Σ
       ; ε = just []
       ; Empty = _≡ []
       ; Empty-is-ε = λ x≡[] → just tt , x≡[]
@@ -49,18 +49,14 @@ module List where
                    ; (_ ∷ _) → false because ofⁿ λ () }
       ; prepend = _∷_
       ; hd = nonempty-head
-      ; tl = nonempty-tail
+      ; tl = {!!} --nonempty-tail
       ; prepend-nonempty = λ ()
       ; hd-prepend = λ c s → refl
-      ; tl-prepend = λ c s → refl
+      ; tl-prepend = λ c s → {!!} --refl
       ; prepend-hd-tl = λ { [] []≢[] → ⊥-elim ([]≢[] refl)
-                          ; (x ∷ s) _ → refl }
+                          ; (x ∷ s) _ → {!!} }
       }
 #+end_src
-Development note: The proofs
-of ~prepend-nonempty~, ~hd-prepend~ and ~tl-prepend~ were
-all completable by auto.
-The proof of ~prepend-hd-tl~ only required a bit of pattern matching.
 
 * TODO Vectors
 
@@ -74,18 +70,18 @@ module Stream where
   InfiniteString : (Σ : Set) → String Σ
   InfiniteString Σ =
     record
-        { Carrier = Σ[ i ∈ Size ] Stream Σ i
+        { Carrier = λ i → Stream Σ i
         ; ε = nothing
         ; Empty = λ _ → ⊥
         ; Empty-is-ε = λ { () }
         ; Empty? = λ s → false because ofⁿ λ x → x
-        ; prepend = λ { x (i , ys) → (↑ i) , (x ∷ λ where .force → ys) }
-        ; hd = λ { (_ , x ∷ _) _ → x }
-        ; tl = λ { (i , _ ∷ xs) _ →  {!!} , {!!} .force }
-        ; prepend-nonempty = {!!}
-        ; hd-prepend = {!!}
-        ; tl-prepend = {!!}
-        ; prepend-hd-tl = {!!}
+        ; prepend = λ { x ys → (x ∷ λ where .force → ys) }
+        ; hd = λ { (x ∷ _) _ → x }
+        ; tl = λ { (_ ∷ xs) _ →  xs .force }
+        ; prepend-nonempty = λ { () }
+        ; hd-prepend = λ _ _ → refl
+        ; tl-prepend = λ _ _ → refl
+        ; prepend-hd-tl = λ { (x ∷ xs) _ → {!!} }
         }
 #+end_src
 
